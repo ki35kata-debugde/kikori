@@ -147,14 +147,14 @@ function buildActs(){
     B('斜め切り △',S.face==='diag'?'sel':'',()=>{S.face='diag';buildActs()},false,top);
     B('水平切り ■',S.face==='horiz'?'sel':'',()=>{S.face='horiz';buildActs()},false,top);
     B('振る','key',swing,WORLD.stamina<swingCost(),middle);
-    B(`研ぐ（砥石 ${WORLD.inv.stone}）`,'',sharpen,WORLD.stamina<5||S.edge>96||WORLD.inv.stone<1,bottom);
+    B(`研ぐ（砥石 ${WORLD.inv.stone}）`,'',sharpen,S.edge>96||WORLD.inv.stone<1,bottom);
     const nd=notchDepth();
     B('追い口へ →',nd>=0.22&&nd<=0.35?'key':'',()=>goto(2),false,bottom);
     B('明日に続く','',postponeCut,false,bottom);
   }
   if(S.phase===2){
     B('振る','key',swing,WORLD.stamina<swingCost());
-    B(`砥ぐ −5（砥石 ${WORLD.inv.stone}）`,'',sharpen,WORLD.stamina<5||S.edge>96||WORLD.inv.stone<1);
+    B(`研ぐ（砥石 ${WORLD.inv.stone}）`,'',sharpen,S.edge>96||WORLD.inv.stone<1);
     B(`楔を打つ −3（残り ${WORLD.inv.wedge}）`,'',useWedge,
       WORLD.stamina<3||WORLD.inv.wedge<1||S.wedges>=2);
     B('倒す',hingeRatio()<=0.12?'key':'',()=>fell(false));
@@ -407,9 +407,9 @@ function swing(){
   if(WORLD.stamina<=0){WORLD.stamina=0;say('<s>今日はここまで。</s>切り口を養生して明日に続けられる。');buildActs()}
 }
 function sharpen(){
-  if(WORLD.stamina<5||WORLD.inv.stone<1)return;
-  WORLD.stamina-=5; WORLD.inv.stone--; S.edge=100;
-  say('砥石をあてた。<b>切れ味 100%</b>（−5 体力）');
+  if(WORLD.inv.stone<1)return;
+  WORLD.inv.stone--; S.edge=100;
+  say('砥石をあてた。<b>切れ味 100%</b>');
   refresh(); buildActs();
 }
 function useWedge(){
@@ -727,18 +727,20 @@ function drawNight(){
     body.querySelectorAll('[data-axe]').forEach(b=>b.onclick=()=>buyAxe(b.dataset.axe));
   }else if(NIGHT_TAB==='goods'){
     const GOOD_TEXT={bento:'毎朝 +8体力。自動で使うか切り替えられる。',
-      stone:'砥ぐ1回分。体力5は別に使う。',
+      stone:'斧を研ぐ1回分。',
       wedge:'追い口で傾きに逆らう。1本ごとに体力3。',
       sapling:'その日Sを取った本数だけ、夕方に自動で植わる。夕方の枠は使わない。<br>'+
               '<b class="ok">1本につき 残り本数+1・上限+1・手入れ度+3</b>'};
     body.innerHTML=Object.entries(GOODS)
       /* 苗は神主の依頼を果たすまで見えない（ROADMAP §12.7） */
       .filter(([k,g])=>!g.locked||WORLD.unlocks[g.locked])
-      .map(([k,g])=>`<div class="shopcard"><h3>${g.name}　${WORLD.inv[k]}個</h3>
-      <p>${GOOD_TEXT[k]||'必要な日に備えて持っておく消耗品。'}</p>
-      <div class="row"><b>${yen(g.price)}円</b><span><button data-good="${k}" data-n="1">1個</button> <button data-good="${k}" data-n="10">10個 −1割</button></span></div>
-      ${k==='bento'?`<div class="row"><span><b>明日の朝</b><br>${WORLD.inv.bento?`体力 100 → ${WORLD.auto.bento?108:100}　／　在庫 ${WORLD.inv.bento}個 → ${WORLD.inv.bento-(WORLD.auto.bento?1:0)}個`:'弁当がない'}</span><button data-auto="${k}" class="${WORLD.auto[k]?'sel':''}" ${WORLD.inv.bento?'':'disabled'}>${WORLD.auto[k]?'明日は食べる':'明日は食べない'}</button></div>`
-      :k==='feed'?`<div class="row"><span>毎朝、自動で使う</span><button data-auto="${k}" class="${WORLD.auto[k]?'sel':''}">${WORLD.auto[k]?'使う':'使わない'}</button></div>`:''}</div>`).join('');
+      .map(([k,g])=>`<div class="shopcard">
+      <div class="goods-top"><h3>${g.name}　${WORLD.inv[k]}個</h3>
+        <span class="goods-buy"><b>${yen(g.price)}円</b><button data-good="${k}" data-n="1">購入</button></span></div>
+      <div class="goods-bottom"><p>${GOOD_TEXT[k]||'必要な日に備えて持っておく消耗品。'}${
+        k==='bento'?`<br>${WORLD.inv.bento?`明朝 体力 ${WORLD.auto.bento?108:100}／在庫 ${WORLD.inv.bento-(WORLD.auto.bento?1:0)}個`:'弁当がない'}`:''}</p>
+      ${k==='bento'?`<button data-auto="${k}" class="${WORLD.auto[k]?'sel':''}" ${WORLD.inv.bento?'':'disabled'}>${WORLD.auto[k]?'明日は食べる':'明日は食べない'}</button>`
+      :k==='feed'?`<button data-auto="${k}" class="${WORLD.auto[k]?'sel':''}">${WORLD.auto[k]?'使う':'使わない'}</button>`:''}</div></div>`).join('');
     body.querySelectorAll('[data-good]').forEach(b=>b.onclick=()=>buyGood(b.dataset.good,+b.dataset.n));
     body.querySelectorAll('[data-auto]').forEach(b=>b.onclick=()=>{WORLD.auto[b.dataset.auto]=!WORLD.auto[b.dataset.auto];drawNight()});
   }else if(NIGHT_TAB==='lumber'){
@@ -859,7 +861,8 @@ function drawNight(){
       drawNight();
     });
   }
-  drawRequestBoard();
+  $('reqboard').classList.toggle('hide',NIGHT_TAB!=='requests');
+  if(NIGHT_TAB==='requests')drawRequestBoard();
 }
 /* 解禁物を日本語にする */
 const UNLOCK_LABEL={miyama:'深山へ入れる',doghouse:'犬小屋',snow:'雪の峰へ入れる',

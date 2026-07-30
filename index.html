@@ -167,7 +167,7 @@
   #mapov:after,#evov:after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(to bottom,rgba(17,22,18,.22),rgba(12,16,13,.55) 70%,rgba(10,13,11,.78))}
   #evov:after{background:linear-gradient(to bottom,rgba(62,39,28,.18),rgba(25,22,18,.52) 72%,rgba(12,14,12,.78))}
-  #ev-bg{opacity:.54}
+  #ev-bg{opacity:.54;object-position:center bottom}
   .daymark{display:inline-block;margin-left:12px;width:29px;height:29px;border-radius:50%;
     vertical-align:-7px;background:#f0c36a;box-shadow:0 0 24px rgba(240,167,70,.46)}
   #evov .daymark{background:#d97945;box-shadow:0 0 25px rgba(217,102,54,.45)}
@@ -207,7 +207,7 @@
   .record-panel .lb{margin-right:4px}
 
   /* 一覧表 */
-  #mapov,#listov{justify-content:flex-start;padding-top:72px}
+  #mapov,#listov,#evov{justify-content:flex-start;padding-top:72px}
   #listov{z-index:34}
   #ltab{width:min(820px,94vw);max-height:74vh;overflow:auto;border:1px solid var(--line);border-radius:3px}
   table{width:100%;border-collapse:collapse;font-size:12px}
@@ -234,8 +234,9 @@
   .ecard .k{margin-top:10px;font-size:10px;letter-spacing:.16em;color:var(--kihada)}
 
   /* 夜・家 */
-  #nightov{justify-content:flex-start;padding-top:54px;
+  #nightov{justify-content:flex-start;padding-top:54px;overflow-x:hidden;
     background:#10110f}
+  #nightov>*:not(.night-room){max-width:100%}
   #nightov>*:not(.night-room){position:relative;z-index:2}
   .night-room{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
     background:
@@ -327,7 +328,7 @@
   .tabico{display:inline-flex;width:17px;height:17px;margin-right:7px;vertical-align:-4px;color:var(--kihada)}
   .tabico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;
     stroke-linecap:round;stroke-linejoin:round}
-  #nighttabs{display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
+  #nighttabs{display:flex;gap:7px;width:100%;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
   #nighttabs button{background:rgba(15,17,15,.62);border-color:rgba(233,227,213,.25)}
   /* まだ受けていない依頼があるとき。戸口に紙が挟まっている合図 */
   #nighttabs button.fresh{position:relative;color:var(--kihada);
@@ -338,7 +339,8 @@
     animation:freshPulse 1.7s ease-in-out infinite}
   @keyframes freshPulse{50%{opacity:.35;transform:scale(.8)}}
   @media (prefers-reduced-motion:reduce){#nighttabs button.fresh .dot{animation:none}}
-  #nightbody{width:min(920px,96vw);display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+  #nightbody{width:min(920px,100%);max-width:100%;display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));gap:12px}
   .shopcard{border:1px solid var(--line);border-radius:3px;padding:16px;background:rgba(255,255,255,.025)}
   #nightov .shopcard{background:rgba(14,16,14,.60);border-color:rgba(233,227,213,.25);
     box-shadow:0 7px 18px rgba(0,0,0,.24)}
@@ -357,6 +359,14 @@
   .shopcard p{font-size:11px;line-height:1.7;color:#aaa69b;margin-bottom:10px}
   .shopcard .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:9px;border-top:1px solid var(--line)}
   .shopcard .row b{font-family:'Shippori Mincho',serif;color:var(--kihada)}
+  .goods-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .goods-top h3{margin:0}
+  .goods-buy{display:flex;align-items:center;gap:8px}
+  .goods-buy b{font-family:'Shippori Mincho',serif;color:var(--kihada)}
+  .goods-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+  .goods-bottom p{margin:0;flex:1}
+  #nightov button{white-space:normal}
   #nightmsg{min-height:24px;margin:12px 0;color:var(--moegi);font-size:12px}
   .stockline{font-size:11px;color:var(--nezumi);line-height:1.8;text-align:center}
 
@@ -481,11 +491,12 @@
   .title-menu button:hover{background:#292b26;color:#f7efd8;border-color:#292b26}
   .title-menu button:disabled{opacity:.38}
   @media (max-width:700px){
-    #titleov{align-items:flex-end;background-position:62% center}
-    #titleov:after{background:linear-gradient(0deg,rgba(247,239,216,.96) 0%,rgba(247,239,216,.72) 43%,transparent 72%)}
-    .title-content{width:auto;margin:0 24px 7vh}
-    .title-content h1{font-size:clamp(28px,9vw,44px)}
-    .title-menu{margin-top:22px;width:min(300px,78vw)}
+    #titleov{align-items:flex-start;background-position:62% center}
+    #titleov:after{background:linear-gradient(180deg,rgba(247,239,216,.96) 0%,rgba(247,239,216,.72) 38%,transparent 68%)}
+    .title-content{width:auto;margin:max(18px,env(safe-area-inset-top)) 18px 0}
+    .title-content h1{font-size:clamp(24px,7.5vw,34px);line-height:1.2}
+    .title-menu{gap:5px;margin-top:10px;width:min(220px,68vw)}
+    .title-menu button{padding:7px 11px;font-size:10.5px;letter-spacing:.08em}
   }
 </style>
 
