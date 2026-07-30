@@ -76,12 +76,9 @@ const gapCm    =()=>notchGap()*T.D*100;   // 上下のずれを cm で
 /* ══════════ 物理 ══════════ */
 
 const GUIDE=[
-`傾き（灰）と風（青）が、木を<em>倒れる側から横へ引っぱる</em>。そのぶんを見越して盤を回す。<br>
- 白い矢印（予想）を緑の印（目標）に重ねれば満点。ズレ3°以内。`,
-`<b>倒す側にクサビ形の切り欠きを作る。</b>斜めと水平が<em>同じ深さで出会って初めて木片が抜ける</em>。断面図で<em>線がはみ出している面が先行している側</em>なので、反対に持ち替えて揃える。<br>
- 深さは直径の22〜35%（下の緑の帯）。開き角が45°より狭いと、倒れきる前に受け口が閉じてツルが折れ、舵を失う。`,
-`<b>反対側から水平に切り込む。</b>縦のバーは<em>斧を入れる高さ</em>で、断面図の右の矢印がそのまま連動する。受け口の床より +2〜+5cm が適正、そこで止めれば威力も最大。<br>
- 残る帯が「ツル」＝舵。断面図の<em>緑の破線まで来たら止めて倒す</em>。低く入れすぎると幹が手前へ蹴り返す。`];
+`傾き（灰）と風（青）が、木を<em>倒れる側から横へ引っぱる</em>。そのぶんを見越して盤を回す。`,
+'',
+''];
 
 /* ══════════ 画面更新 ══════════ */
 function topbar(){
@@ -106,12 +103,21 @@ function refresh(){
   if(S.phase===1||S.phase===2)drawSection();
   drawEval(); updateWorld3();
 }
+function setEvalFolded(folded){
+  const el=$('eval');
+  const foldable=S&&S.phase>=1&&S.phase<=2;
+  el.classList.toggle('foldable',foldable);
+  el.classList.toggle('collapsed',foldable&&folded);
+  $('eval-toggle').textContent=foldable&&!folded?'評価詳細 −':'評価詳細 ＋';
+}
+$('eval-toggle').onclick=()=>setEvalFolded(!$('eval').classList.contains('collapsed'));
 
 /* ══════════ 操作盤 ══════════ */
 function buildActs(){
-  const a=$('acts');a.innerHTML='';
-  const B=(t,cls,fn,dis)=>{const b=document.createElement('button');
-    b.innerHTML=t;b.className=cls||'';b.onclick=fn;b.disabled=!!dis;a.appendChild(b)};
+  const a=$('acts');a.innerHTML='';a.className='';
+  const B=(t,cls,fn,dis,parent=a)=>{const b=document.createElement('button');
+    b.innerHTML=t;b.className=cls||'';b.onclick=fn;b.disabled=!!dis;parent.appendChild(b)};
+  const ROW=(kind)=>{const row=document.createElement('div');row.className=`act-row ${kind}`;a.appendChild(row);return row};
   const GRP=(cap,mi,val,pl)=>{const g=document.createElement('div');g.className='grp';
     const c=document.createElement('span');c.className='cp';c.textContent=cap;
     const bm=document.createElement('button');bm.textContent='◀';bm.onclick=mi;
@@ -136,16 +142,15 @@ function buildActs(){
     B('この向きで切る','key',()=>goto(1));
   }
   if(S.phase===1){
-    B(`斜め切り ▲ <span style="opacity:.55">${T.cost}</span>`,S.face==='diag'?'sel':'',
-      ()=>{S.face='diag';buildActs()});
-    B(`水平切り ▬ <span style="opacity:.55">${T.cost+1}</span>`,S.face==='horiz'?'sel':'',
-      ()=>{S.face='horiz';buildActs()});
-    GRP('開き角',()=>{S.nAngle=clamp(S.nAngle-5,30,80);refresh();buildActs()},
-        S.nAngle+'°',()=>{S.nAngle=clamp(S.nAngle+5,30,80);refresh();buildActs()});
-    B('振る','key',swing,WORLD.stamina<swingCost());
-    B(`砥ぐ −5（砥石 ${WORLD.inv.stone}）`,'',sharpen,WORLD.stamina<5||S.edge>96||WORLD.inv.stone<1);
+    a.className='cut-actions';
+    const top=ROW('two'),middle=ROW('one'),bottom=ROW('three');
+    B('斜め切り △',S.face==='diag'?'sel':'',()=>{S.face='diag';buildActs()},false,top);
+    B('水平切り ■',S.face==='horiz'?'sel':'',()=>{S.face='horiz';buildActs()},false,top);
+    B('振る','key',swing,WORLD.stamina<swingCost(),middle);
+    B(`研ぐ（砥石 ${WORLD.inv.stone}）`,'',sharpen,WORLD.stamina<5||S.edge>96||WORLD.inv.stone<1,bottom);
     const nd=notchDepth();
-    B('追い口へ →',nd>=0.22&&nd<=0.35?'key':'',()=>goto(2));
+    B('追い口へ →',nd>=0.22&&nd<=0.35?'key':'',()=>goto(2),false,bottom);
+    B('明日に続く','',postponeCut,false,bottom);
   }
   if(S.phase===2){
     B('振る','key',swing,WORLD.stamina<swingCost());
@@ -154,7 +159,7 @@ function buildActs(){
       WORLD.stamina<3||WORLD.inv.wedge<1||S.wedges>=2);
     B('倒す',hingeRatio()<=0.12?'key':'',()=>fell(false));
   }
-  B('明日続きを切る','',postponeCut);
+  if(S.phase!==1)B('明日に続く','',postponeCut);
 }
 const say=h=>{$('say').innerHTML=h};
 
@@ -342,7 +347,7 @@ function goto(ph){
   if(ph===2){want.r=3.2;want.ty=.95;
     say('追い口。縦のバーで<b>入れる高さ</b>を決める。緑の帯が適正。');
     setTimeout(()=>{if(S.phase===2)gaugeOn(true)},350)}
-  buildActs(); refresh();
+  buildActs(); refresh(); setEvalFolded(ph===1||ph===2);
   /* 向きを決める場面と、斧を入れる場面で一度ずつ */
   if(ph===0)showTutorial('aim');
   if(ph===1)showTutorial('cut');
@@ -353,7 +358,7 @@ function swing(){
   if(SCREEN!=='play')return;
   if((S.phase!==1&&S.phase!==2)||!gRun||gCool>0)return;
   if(WORLD.stamina<swingCost()){
-    gaugeOff();say('<s>今日はもう斧を振れない。</s>「明日続きを切る」で切り口を養生する。');
+    gaugeOff();say('<s>今日はもう斧を振れない。</s>「明日に続く」で切り口を養生する。');
     buildActs();return;
   }
   const q=quality(), h=gVert?curHeight():0;
@@ -399,7 +404,7 @@ function swing(){
     setTimeout(()=>{if(S.phase===2)gaugeOn(true)},430);
   }
   refresh(); buildActs();
-  if(WORLD.stamina<=0){WORLD.stamina=0;say('<s>今日はここまで。</s>切り口を養生して明日続きを切れる。');buildActs()}
+  if(WORLD.stamina<=0){WORLD.stamina=0;say('<s>今日はここまで。</s>切り口を養生して明日に続けられる。');buildActs()}
 }
 function sharpen(){
   if(WORLD.stamina<5||WORLD.inv.stone<1)return;
@@ -526,7 +531,6 @@ function showResult(){
   B('売って地図へ','',()=>finish('sell',toMap));
   B('売って伐採を終える','',()=>finish('sell',toEvening));
   if(total>=74)soundSuccess();
-  topbar();
   $('result').classList.add('show');
   showTutorial('result');
 }

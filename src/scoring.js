@@ -34,8 +34,10 @@ function drawEval(){
     total+=c.score(v);
     html+=`<div class="ev"><span class="n">${c.n}</span><span class="t">${c.t}</span><span class="v ${c.state(v)}">${c.fmt(v)}</span></div>`;
   }
-  $('e-rows').innerHTML=html;
   const sh=S.barber?Math.round(total*.2):total;
+  $('e-rows').innerHTML=S.phase===0
+    ?`<div class="ev"><span class="n">倒す角度</span><span class="t"></span><span class="v ${Phys.predErr()<3?'ok':Phys.predErr()<8?'mid':'ng'}">${Phys.predErr().toFixed(1)}°</span></div>`
+    :html;
   $('e-score').textContent=sh;
   $('e-score').className=sh>=85?'ok':sh>=60?'mid':sh>=35?'':'ng';
   return total;
