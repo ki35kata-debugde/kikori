@@ -398,10 +398,9 @@ function showTreeCard(t){
     `<div class="tr"><span>直径 / 樹高</span><b>${Math.round(t.D*100)}cm / ${t.H.toFixed(1)}m</b></div>`+
     `<div class="tr"><span>通直度</span>${meter(t.straight,true)}</div>`+
     `<div class="tr"><span>節の多さ</span>${meter(t.knots,false)}</div>`+
-    `<div class="tr"><span>体力の目安</span><b class="${afford?'':'ng'}">約 ${estimate}</b></div>`+
-    `<div class="tr"><span>一振り</span><b>${t.cost}〜${t.cost+2}</b></div>`;
+    `<div class="tr"><span>体力の目安</span><b class="${afford?'':'ng'}">約 ${estimate}</b></div>`;
   $('tc-price').innerHTML=`<span class="lb">推定売値</span><b>${yen(t.price)}</b><u> 円</u>`;
-  $('tc-ft').textContent=t.ft;
+  $('tc-ft').textContent='';
   const sense=$('tc-dog');
   if(hasDog('shiba')){
     const p=treePotential(t);
@@ -418,7 +417,7 @@ function showTreeCard(t){
 /* ══════════ 一覧表 ══════════ */
 function drawList(){
   const cols=[['req','依頼'],...(hasDog('shiba')?[['sense','柴犬鑑定']]:[]),['name','樹種'],['grade','品等'],['D','直径'],
-              ['price','売値'],['est','体力'],['straight','通直'],['knots','節']];
+              ['price','売値'],['est','体力']];
   const rows=stand.map((t,i)=>({...t,req:requestMatches(t)?1:0,sense:dogSense(t),i})).filter(t=>!nodes[t.i].cut);
   rows.sort((a,b)=>{const x=a[sortKey],y=b[sortKey];
     return (typeof x==='string'? x.localeCompare(y) : x-y)*sortDir});
@@ -429,8 +428,7 @@ function drawList(){
       <td class="mid">${t.req?'★':''}</td>${hasDog('shiba')?`<td class="mid dog-sense ${treePotential(t)}">${dogSenseMark(t)}</td>`:''}<td>${t.name}</td><td>${t.grade}</td>
       <td>${Math.round(t.D*100)}cm</td>
       <td>${yen(t.price)}</td>
-      <td class="${treeEst(t)<=WORLD.stamina?'':'ng'}">${treeEst(t)}</td>
-      <td>${t.straight.toFixed(0)}</td><td>${t.knots.toFixed(0)}</td></tr>`).join('')
+      <td class="${treeEst(t)<=WORLD.stamina?'':'ng'}">${treeEst(t)}</td></tr>`).join('')
   }</tbody></table>`;
   $('ltab').querySelectorAll('th').forEach(th=>th.onclick=()=>{
     const k=th.dataset.k;
@@ -590,4 +588,3 @@ $('tut-skip').onclick=finishTutorial;
 if(firstRun&&!tutorialDone())showOpening();
 toMap(); applyCam();
 requestAnimationFrame(loop);
-

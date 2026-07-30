@@ -292,8 +292,7 @@ function toForest(){
   $('treecard').classList.remove('hide');
   updateForestMascot();
   $('tc-empty').classList.remove('hide'); $('tc-body').classList.add('hide');
-  const f=FORESTS[WORLD.at];
-  $('guide').innerHTML=`<b>${f.name}。16本を見て回った。</b>同じ樹種でも、太さ・通直度・節で品等と値が変わる。<br>木をクリックすると見立てが出る。数が多いときは「見立て一覧」が早い。`;
+  $('guide').innerHTML='';
   say('');
   fitStand(); orb.az=0; orb.el=.22; orb.tgt.set(0,8,0);
   sel=-1; ringSel.visible=false;
