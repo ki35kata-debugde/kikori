@@ -130,6 +130,7 @@
   #acts.cut-actions{display:grid;gap:8px}
   .act-row{display:grid;gap:8px}
   .act-row.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .act-row.split{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
   .act-row.three{grid-template-columns:repeat(3,minmax(0,1fr))}
   .act-row button{width:100%;padding-left:8px;padding-right:8px}
 
@@ -701,7 +702,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-2"></script>
 <script src="src/tutorial.js?v=20260731-2"></script>
-<script src="src/game.js?v=20260731-2"></script>
+<script src="src/game.js?v=20260731-3"></script>
 <script src="src/scene3d.js?v=20260731-2"></script>
 <script>
 (() => {

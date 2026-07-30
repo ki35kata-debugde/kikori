@@ -147,19 +147,22 @@ function buildActs(){
     B('斜め切り △',S.face==='diag'?'sel':'',()=>{S.face='diag';buildActs()},false,top);
     B('水平切り ■',S.face==='horiz'?'sel':'',()=>{S.face='horiz';buildActs()},false,top);
     B('振る','key',swing,WORLD.stamina<swingCost(),middle);
-    B(`研ぐ（砥石 ${WORLD.inv.stone}）`,'',sharpen,S.edge>96||WORLD.inv.stone<1,bottom);
+    B(`研ぐ（砥石${WORLD.inv.stone}）`,'',sharpen,S.edge>96||WORLD.inv.stone<1,bottom);
     const nd=notchDepth();
     B('追い口へ →',nd>=0.22&&nd<=0.35?'key':'',()=>goto(2),false,bottom);
     B('明日に続く','',postponeCut,false,bottom);
   }
   if(S.phase===2){
-    B('振る','key',swing,WORLD.stamina<swingCost());
-    B(`研ぐ（砥石 ${WORLD.inv.stone}）`,'',sharpen,S.edge>96||WORLD.inv.stone<1);
-    B(`楔を打つ −3（残り ${WORLD.inv.wedge}）`,'',useWedge,
-      WORLD.stamina<3||WORLD.inv.wedge<1||S.wedges>=2);
-    B('倒す',hingeRatio()<=0.12?'key':'',()=>fell(false));
+    a.className='cut-actions';
+    const top=ROW('split'),bottom=ROW('three');
+    B('振る','key',swing,WORLD.stamina<swingCost(),top);
+    B('倒す',hingeRatio()<=0.12?'key':'',()=>fell(false),false,top);
+    B(`研ぐ（砥石${WORLD.inv.stone}）`,'',sharpen,S.edge>96||WORLD.inv.stone<1,bottom);
+    B(`楔を打つ（楔${WORLD.inv.wedge}）`,'',useWedge,
+      WORLD.inv.wedge<1||S.wedges>=2,bottom);
+    B('明日に続く','',postponeCut,false,bottom);
   }
-  if(S.phase!==1)B('明日に続く','',postponeCut);
+  if(S.phase!==1&&S.phase!==2)B('明日に続く','',postponeCut);
 }
 const say=h=>{$('say').innerHTML=h};
 
@@ -413,8 +416,8 @@ function sharpen(){
   refresh(); buildActs();
 }
 function useWedge(){
-  if(S.phase!==2||S.wedges>=2||WORLD.stamina<3||WORLD.inv.wedge<1)return;
-  WORLD.stamina-=3; WORLD.inv.wedge--; S.wedges++;
+  if(S.phase!==2||S.wedges>=2||WORLD.inv.wedge<1)return;
+  WORLD.inv.wedge--; S.wedges++;
   soundWedge();
   mascotReact('wedge');
   const err=Phys.predErr();
@@ -728,7 +731,7 @@ function drawNight(){
   }else if(NIGHT_TAB==='goods'){
     const GOOD_TEXT={bento:'毎朝 +8体力。自動で使うか切り替えられる。',
       stone:'斧を研ぐ1回分。',
-      wedge:'追い口で傾きに逆らう。1本ごとに体力3。',
+      wedge:'追い口で傾きに逆らう。1本ずつ使う。',
       sapling:'その日Sを取った本数だけ、夕方に自動で植わる。夕方の枠は使わない。<br>'+
               '<b class="ok">1本につき 残り本数+1・上限+1・手入れ度+3</b>'};
     body.innerHTML=Object.entries(GOODS)
