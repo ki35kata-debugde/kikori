@@ -1,0 +1,652 @@
+﻿<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>木こり — 一本伐倒</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
+  :root{
+    --sumi:#131714; --washi:#e9e3d5; --nezumi:#8b8f88;
+    --kihada:#d4a94e; --moegi:#7fa85c; --ai:#6f97b5; --ake:#c04a32;
+    --line:rgba(233,227,213,.13); --pane:rgba(14,18,15,.88);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--sumi);color:var(--washi);
+    font-family:'Zen Kaku Gothic New',system-ui,sans-serif;overflow:hidden;
+    -webkit-font-smoothing:antialiased;font-size:14px}
+  #stage{position:fixed;inset:0}
+  canvas{display:block}
+  /* 昼の3Dを朝夕夜の水彩に寄せる。彩度と対比を落とし、紙目を一枚かぶせる（SPEC §16.8） */
+  #stage canvas{filter:saturate(.84) contrast(.93) brightness(1.03)}
+  #stage:before,#stage:after{content:"";position:absolute;inset:0;pointer-events:none}
+  #stage:before{z-index:1;opacity:.13;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23p)'/%3E%3C/svg%3E")}
+  /* 画面の四隅を紙のように沈ませ、絵の外周をつくる */
+  #stage:after{z-index:2;
+    background:radial-gradient(ellipse 78% 72% at 50% 46%,transparent 42%,rgba(46,52,42,.30) 100%)}
+  .lb{font-size:10px;letter-spacing:.3em;color:var(--nezumi);display:block}
+  .mn{font-family:'Shippori Mincho',serif;font-weight:800}
+  .hide{display:none!important}
+  .ok{color:var(--moegi)} .ng{color:var(--ake)} .mid{color:var(--kihada)} .off{color:#565a55}
+
+  /* 上部バー。読み込みボタンを含む常設の帯なので、.ov（地図・夕方・夜, z-index30）や
+     #result（z-index40）より必ず上に出す。以前は z-index:8 で、
+     どの画面に切り替えても読み込みボタンが overlay の下に隠れて押せなかった。 */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:41;display:flex;align-items:center;
+    gap:22px;padding:11px 22px;background:linear-gradient(to bottom,rgba(10,13,11,.94),transparent)}
+  #topbar .t{font-family:'Shippori Mincho',serif;font-weight:800;font-size:17px;
+    letter-spacing:.24em;margin-right:auto}
+  #topbar .m{text-align:right}
+  #topbar .m b{font-family:'Shippori Mincho',serif;font-size:20px;line-height:1.1;display:block}
+  #topbar .m b u{font-size:10px;text-decoration:none;color:var(--nezumi)}
+  #sound-toggle,#load-shortcut{padding:7px 9px;font-size:9px;letter-spacing:.12em;border-radius:999px}
+  #sound-toggle.off{color:var(--nezumi)}
+  #quick-loads{position:absolute;right:18px;top:48px;z-index:40;width:230px;
+    padding:9px;background:rgba(10,13,11,.96);border:1px solid var(--line);
+    box-shadow:0 9px 24px rgba(0,0,0,.45)}
+  #quick-loads button{display:block;width:100%;margin-top:5px;text-align:left}
+
+  /* 右パネル */
+  .rpane{position:fixed;top:56px;right:18px;z-index:5;width:246px;
+    background:var(--pane);border:1px solid var(--line);border-radius:3px;padding:12px 14px}
+  .rpane .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .rpane .hd b{font-family:'Shippori Mincho',serif;font-size:22px;line-height:1}
+  .ev{display:grid;grid-template-columns:1fr auto auto;gap:5px;align-items:baseline;
+    padding:5px 0;border-top:1px solid var(--line);font-size:11px}
+  .ev .n{color:var(--nezumi)} .ev .t{font-size:9.5px;color:#6a6e68}
+  .ev .v{font-family:'Shippori Mincho',serif;font-size:14px;min-width:52px;text-align:right}
+
+  #tc-name{font-family:'Shippori Mincho',serif;font-weight:800;font-size:28px;letter-spacing:.1em;line-height:1.1}
+  #tc-grade{font-size:11px;letter-spacing:.2em;color:var(--kihada);margin-bottom:10px}
+  .tr{display:flex;justify-content:space-between;align-items:center;
+    padding:6px 0;border-top:1px solid var(--line);font-size:11.5px}
+  .tr span{color:var(--nezumi)} .tr b{font-family:'Shippori Mincho',serif;font-size:15px}
+  .meter{height:5px;background:rgba(0,0,0,.45);border:1px solid var(--line);
+    border-radius:2px;position:relative;overflow:hidden;width:76px}
+  .meter i{position:absolute;left:0;top:0;bottom:0;display:block}
+  #tc-price{margin-top:10px;text-align:right}
+  #tc-price b{font-family:'Shippori Mincho',serif;font-size:26px}
+  #tc-price u{font-size:11px;text-decoration:none;color:var(--nezumi)}
+  #tc-ft{margin-top:9px;font-size:11px;line-height:1.7;color:#b0aca0}
+  #tc-dog{margin-top:10px;padding:7px 9px;border:1px dashed rgba(233,227,213,.18);
+    border-radius:2px;font-size:10.5px;line-height:1.6;color:#7c807a}
+  #tc-dog em{font-style:normal;color:var(--kihada)}
+  .dog-sense{font-family:'Shippori Mincho',serif;font-weight:800}
+  .dog-sense.fine{color:#8fb76d}.dog-sense.normal{color:#aaa99f}.dog-sense.rot{color:#d06a52}
+  #tc-empty{font-size:12px;line-height:1.8;color:var(--nezumi);padding:4px 0}
+
+  /* 左パネル */
+  #dialbox{position:fixed;left:20px;bottom:200px;z-index:5;width:190px}
+  #dial{width:164px;height:164px}
+  #legend{margin-top:7px;font-size:10px;line-height:1.8;color:var(--nezumi)}
+  #legend i{display:inline-block;width:18px;font-style:normal;text-align:center;margin-right:4px}
+  #err{margin-top:8px;padding:7px 10px;border:1px solid var(--line);border-radius:2px;
+    background:var(--pane);width:164px}
+  #err b{font-family:'Shippori Mincho',serif;font-size:23px;line-height:1}
+
+  #cutbox{position:fixed;left:20px;bottom:190px;z-index:5;
+    background:var(--pane);border:1px solid var(--line);border-radius:3px;padding:11px 12px;
+    display:flex;gap:10px;align-items:stretch}
+  #sect{width:280px;height:220px}
+  /* 縦ゲージ */
+  #vg{width:58px;display:flex;flex-direction:column;align-items:center;padding-top:4px}
+  #vg .cap{font-size:9.5px;letter-spacing:.14em;color:var(--nezumi);margin-bottom:6px;text-align:center;line-height:1.4}
+  #vgbar{position:relative;width:16px;flex:1;border:1px solid var(--line);
+    background:rgba(0,0,0,.45);border-radius:2px;overflow:hidden;min-height:120px}
+  #vg-hit{position:absolute;left:0;right:0;background:rgba(127,168,92,.22)}
+  #vg-perf{position:absolute;left:0;right:0;background:rgba(212,169,78,.4)}
+  #vg-zero{position:absolute;left:-4px;right:-4px;height:1px;background:rgba(233,227,213,.45)}
+  #vg-needle{position:absolute;left:-5px;right:-5px;height:2px;background:var(--washi);
+    box-shadow:0 0 9px rgba(233,227,213,.9)}
+  #vg-val{margin-top:7px;font-family:'Shippori Mincho',serif;font-size:16px;text-align:center}
+  #vg-val u{font-size:9px;text-decoration:none;color:var(--nezumi)}
+
+  /* 下部 */
+  #panel{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:0 22px 16px;
+    background:linear-gradient(to top,rgba(10,13,11,.97) 46%,transparent)}
+  #inner{max-width:820px;margin:0 auto}
+  #phase{display:flex;border-top:1px solid var(--line)}
+  .ph{flex:1;padding:8px 0 0;text-align:center;font-size:11px;letter-spacing:.18em;
+    color:#5d615b;border-top:2px solid transparent;margin-top:-1px;transition:.3s}
+  .ph.on{color:var(--kihada);border-top-color:var(--kihada)}
+  .ph.done{color:var(--moegi);border-top-color:rgba(127,168,92,.45)}
+  #guide{font-size:12px;line-height:1.8;color:#b9b5a8;margin:10px 0 8px}
+  #guide b{color:var(--washi);font-weight:700} #guide em{font-style:normal;color:var(--kihada)}
+  #say{font-size:13px;line-height:1.6;min-height:20px;margin-bottom:9px}
+  #say b{color:var(--kihada)} #say s{text-decoration:none;color:var(--ake)} #say g{color:var(--moegi)}
+  #gauge{position:relative;height:28px;border:1px solid var(--line);background:rgba(0,0,0,.4);
+    overflow:hidden;border-radius:2px;opacity:.25;transition:opacity .2s}
+  #gauge.live{opacity:1}
+  #zone{position:absolute;top:0;bottom:0;background:rgba(127,168,92,.22)}
+  #perf{position:absolute;top:0;bottom:0;background:rgba(212,169,78,.38)}
+  #needle{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--washi);
+    box-shadow:0 0 9px rgba(233,227,213,.85)}
+  #gauge .cap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:9px;letter-spacing:.2em;color:rgba(255,255,255,.5)}
+  #acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+  button{font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:.13em;
+    padding:11px 16px;border:1px solid var(--line);border-radius:2px;background:transparent;
+    color:var(--washi);cursor:pointer;transition:.16s;white-space:nowrap}
+  button:hover:not(:disabled){background:rgba(233,227,213,.08);border-color:rgba(233,227,213,.36)}
+  button:disabled{opacity:.24;cursor:default}
+  button.key{background:var(--kihada);color:#191305;border-color:var(--kihada);padding:11px 24px}
+  button.key:hover:not(:disabled){background:#e5bb60;border-color:#e5bb60}
+  button.sel{border-color:var(--kihada);color:var(--kihada);background:rgba(212,169,78,.1)}
+  button:focus-visible{outline:2px solid var(--kihada);outline-offset:2px}
+  .grp{display:flex;align-items:center;border:1px solid var(--line);border-radius:2px}
+  .grp button{border:none;padding:11px 12px}
+  .grp .val{font-family:'Shippori Mincho',serif;font-size:14px;min-width:58px;text-align:center;color:var(--kihada)}
+  .grp .cp{font-size:9.5px;letter-spacing:.18em;color:var(--nezumi);padding-left:10px}
+
+  /* オーバーレイ共通 */
+  .ov{position:fixed;inset:0;z-index:30;background:rgba(11,14,12,.96);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:24px;overflow:auto}
+  .ov h1{font-family:'Shippori Mincho',serif;font-weight:800;font-size:28px;
+    letter-spacing:.22em;margin-bottom:5px}
+  .ov .sub{font-size:12px;color:var(--nezumi);letter-spacing:.14em;margin-bottom:24px;text-align:center;line-height:1.8}
+  #mapov,#evov{background:#101410}
+  #mapov>*:not(.forest-scene),#evov>*:not(.forest-scene){position:relative;z-index:2}
+  .forest-scene{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;
+    opacity:.55;transition:filter .35s ease,opacity .35s ease;pointer-events:none}
+  .forest-scene.tone-0{filter:saturate(1.12) brightness(1.04) sepia(.10) hue-rotate(-8deg)}
+  .forest-scene.tone-1{filter:saturate(1.18) brightness(1.07) hue-rotate(8deg)}
+  .forest-scene.tone-2{filter:saturate(1.20) brightness(1.02) hue-rotate(-18deg)}
+  .forest-scene.tone-3{filter:saturate(1.08) brightness(1.04) hue-rotate(24deg)}
+  .forest-scene.tone-4{filter:saturate(.98) brightness(1.12) hue-rotate(72deg)}
+  #mapov:after,#evov:after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(to bottom,rgba(17,22,18,.22),rgba(12,16,13,.55) 70%,rgba(10,13,11,.78))}
+  #evov:after{background:linear-gradient(to bottom,rgba(62,39,28,.18),rgba(25,22,18,.52) 72%,rgba(12,14,12,.78))}
+  #ev-bg{opacity:.54}
+  .daymark{display:inline-block;margin-left:12px;width:29px;height:29px;border-radius:50%;
+    vertical-align:-7px;background:#f0c36a;box-shadow:0 0 24px rgba(240,167,70,.46)}
+  #evov .daymark{background:#d97945;box-shadow:0 0 25px rgba(217,102,54,.45)}
+
+  /* 地図 */
+  #mapcards{display:flex;gap:13px;flex-wrap:wrap;justify-content:center;max-width:1000px}
+  .fcard{width:238px;border:1px solid var(--line);border-radius:3px;padding:17px 17px 15px;
+    background:rgba(13,17,14,.54);cursor:pointer;transition:.2s;text-align:left}
+  .fcard:hover:not(.lock){border-color:var(--kihada);background:rgba(212,169,78,.07);transform:translateY(-3px)}
+  .fcard.chosen{border-color:var(--kihada);background:rgba(212,169,78,.12);box-shadow:0 0 0 1px rgba(212,169,78,.2)}
+  .fcard.lock{opacity:.5;cursor:default}
+  .fcard.poor{border-color:rgba(192,74,50,.35)}
+  .fcard h2{font-family:'Shippori Mincho',serif;font-weight:800;font-size:22px;letter-spacing:.1em}
+  .fcard .mix{font-size:10px;color:var(--nezumi);letter-spacing:.16em;margin:2px 0 12px}
+  .fr{display:flex;justify-content:space-between;align-items:center;
+    padding:6px 0;border-top:1px solid var(--line);font-size:11px}
+  .fr span{color:var(--nezumi)} .fr b{font-family:'Shippori Mincho',serif;font-size:14px}
+  .fcard .fore{margin-top:11px;padding:8px 9px;border:1px solid var(--line);border-radius:2px;
+    background:rgba(0,0,0,.25)}
+  .fcard .fore .lb{margin-bottom:3px}
+  .fcard .fore b{font-family:'Shippori Mincho',serif;font-size:16px;letter-spacing:.08em}
+  .fcard .note{margin-top:9px;font-size:10.5px;line-height:1.65;color:#9a9d95}
+  /* 解禁の条件は手がかりなので黄檗。.fcard .note より詳細度を上げる */
+  .fcard .note.mid{color:var(--kihada)}
+  .fcard .note.ng{color:var(--ake)}
+  .fcard .cost{margin-top:11px;display:flex;justify-content:space-between;align-items:baseline}
+  .fcard .cost em{font-style:normal;font-size:10px;letter-spacing:.2em;color:var(--nezumi)}
+  .fcard .cost b{font-family:'Shippori Mincho',serif;font-size:22px;color:var(--kihada)}
+  .fcard .cost b.ng{color:var(--ake)}
+  .fcard .calc{margin-top:2px;text-align:right;font-size:9.5px;letter-spacing:.02em;color:#6a6e68}
+  .fcard .calc u{text-decoration:none;color:var(--moegi)}
+  .fcard .after{margin-top:5px;text-align:right;font-size:10.5px;letter-spacing:.04em;color:var(--nezumi)}
+  .fcard .after b{font-family:'Shippori Mincho',serif;font-size:14px;color:var(--washi)}
+  .fcard .after b.ng{color:var(--ake)}
+  .record-panel{display:flex;gap:7px;align-items:center;justify-content:center;flex-wrap:wrap;
+    margin:-12px 0 16px;padding:8px 10px;border-radius:3px;background:rgba(10,13,11,.72)}
+  .record-panel .lb{margin-right:4px}
+
+  /* 一覧表 */
+  #listov{z-index:34}
+  #ltab{width:min(820px,94vw);max-height:74vh;overflow:auto;border:1px solid var(--line);border-radius:3px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{position:sticky;top:0;background:#1a201b;font-size:10px;letter-spacing:.16em;
+    color:var(--nezumi);font-weight:500;padding:9px 8px;text-align:right;cursor:pointer;
+    border-bottom:1px solid var(--line);white-space:nowrap}
+  th:nth-child(-n+3){text-align:left}
+  th:hover{color:var(--washi)}
+  td{padding:8px;border-bottom:1px solid rgba(233,227,213,.06);text-align:right;
+    font-family:'Shippori Mincho',serif;font-size:13px}
+  td:nth-child(-n+3){text-align:left}
+  tr{cursor:pointer} tbody tr:hover{background:rgba(212,169,78,.09)}
+  tbody tr.on{background:rgba(212,169,78,.16)}
+
+  /* 夕方 */
+  #evcards{display:flex;gap:13px;flex-wrap:wrap;justify-content:center;max-width:900px}
+  .ecard{width:206px;border:1px solid var(--line);border-radius:3px;padding:18px;
+    background:rgba(255,255,255,.02);cursor:pointer;transition:.2s;text-align:left}
+  .ecard:hover:not(.dis){border-color:var(--kihada);background:rgba(212,169,78,.07);transform:translateY(-3px)}
+  .ecard.dis{opacity:.3;cursor:default}
+  .ecard h3{font-family:'Shippori Mincho',serif;font-weight:800;font-size:19px;letter-spacing:.1em;margin-bottom:3px}
+  .ecard .c{font-size:10px;letter-spacing:.2em;color:var(--ake);margin-bottom:11px}
+  .ecard .e{font-size:11.5px;line-height:1.75;color:#bdb9ac}
+  .ecard .k{margin-top:10px;font-size:10px;letter-spacing:.16em;color:var(--kihada)}
+
+  /* 夜・家 */
+  #nightov{justify-content:flex-start;padding-top:54px;
+    background:#10110f}
+  #nightov>*:not(.night-room){position:relative;z-index:2}
+  .night-room{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    background:
+      linear-gradient(to bottom,rgba(8,10,9,.08),rgba(8,10,9,.24) 68%,rgba(0,0,0,.92) 100%),
+      url('assets/night-home-simple.png') center/cover no-repeat}
+  .night-room:before{content:"";position:absolute;left:0;right:0;bottom:0;height:31%;
+    background:linear-gradient(to bottom,rgba(75,55,34,.16),rgba(40,28,18,.4));
+    border-top:1px solid rgba(212,169,78,.12)}
+  .hearth{position:absolute;left:4%;bottom:2%;width:150px;height:72px;
+    border-radius:50%;background:radial-gradient(ellipse,rgba(242,136,48,.22),rgba(20,14,9,.88) 64%);
+    border:2px solid rgba(120,91,55,.4)}
+  .hearth:before,.hearth:after{content:"";position:absolute;bottom:31px;width:16px;height:46px;
+    border-radius:60% 40% 55% 45%;transform-origin:50% 100%;filter:drop-shadow(0 0 11px rgba(255,155,55,.7));
+    animation:fire 1.25s ease-in-out infinite alternate}
+  .hearth:before{left:57px;background:#d96d2f;transform:rotate(-8deg)}
+  .hearth:after{left:78px;height:36px;background:#f2b54b;animation-delay:-.65s;transform:rotate(9deg)}
+  /* 土間に入れた犬。左側は囲炉裏（left:4%、火）があるので、
+     右側の空き床（カード列は中央寄せで幅920px止まりなので、右の余白は常に空く）に置く。
+     火から離れているので、フチのオレンジの照り返しは外した。
+     ゆっくり左右へ歩き回らせ、静止画のままにならないようにする。 */
+  #night-dog{position:absolute;right:2%;bottom:2%;width:168px;height:168px;object-fit:contain;
+    transform:scaleX(-1);filter:drop-shadow(0 5px 8px rgba(0,0,0,.5));
+    animation:nightDogPatrol 10s ease-in-out infinite}
+  /* コマ絵（待機／喜び）で動かせる犬は、絵そのものが動くのでスライドは止める。
+     まだコマ絵が無い犬（1枚絵）だけ、左右スライドで「動いている」ことを示す。 */
+  #night-dog.framed{animation:none;transform:scaleX(-1)}
+  @keyframes nightDogPatrol{
+    0%,8%{transform:scaleX(-1) translateX(0)}
+    28%,36%{transform:scaleX(-1) translateX(-34px) translateY(-2px)}
+    50%,58%{transform:scaleX(-1) translateX(0)}
+    78%,86%{transform:scaleX(-1) translateX(26px) translateY(-2px)}
+    100%{transform:scaleX(-1) translateX(0)}
+  }
+  @media (max-width:700px){#night-dog{right:3%;width:120px;height:120px}}
+  @media (prefers-reduced-motion:reduce){#night-dog{animation:none}}
+  @keyframes fire{to{transform:translateY(-5px) scale(.82,1.13) rotate(5deg);opacity:.72}}
+  /* マスコットは左下に立ち、林の中心（右側）を向く必要がある。
+     素材が右向きに描かれているので、反転はしない（none）。
+     左向きの素材に差し替えたら --face を scaleX(-1) に戻す。 */
+  #forest-mascot{position:fixed;left:18px;bottom:162px;z-index:7;width:112px;height:112px;
+    object-fit:contain;filter:drop-shadow(0 5px 5px rgba(0,0,0,.5));
+    --face:none;transform:var(--face);animation:birdBob 1.8s ease-in-out infinite alternate;pointer-events:none}
+  /* #result（z-index40）の下に隠れて見えなかった。結果画面が開いている間だけ手前に出す */
+  body:has(#result.show) #forest-mascot{z-index:41}
+  #forest-mascot.forest-dog{width:126px;height:126px;animation:dogBreathe 2.4s ease-in-out infinite alternate;
+    transform-origin:50% 86%}
+  /* 秋田犬は体格が大きいので、少し大きく映す */
+  #forest-mascot.dog-akita{width:138px;height:138px}
+  /* 絵が欠けたときだけ柴犬を借りる保険。ふだんは効かない */
+  #forest-mascot.stand-in:not(.dog-shiba){filter:drop-shadow(0 5px 5px rgba(0,0,0,.5)) saturate(.7)}
+  #forest-mascot.react-chop{animation:mascotHop .34s ease-out}
+  #forest-mascot.forest-dog.react-chop{animation:dogChop .38s ease-out}
+  #forest-mascot.react-critical{animation:mascotBigHop .55s ease-out}
+  #forest-mascot.forest-dog.react-critical{animation:dogCheer .58s ease-out}
+  #forest-mascot.react-fall{animation:mascotStartle .62s ease-out}
+  #forest-mascot.forest-dog.react-fall{animation:dogStartle .68s ease-out}
+  #forest-mascot.react-wedge{animation:mascotTilt .42s ease-out}
+  #forest-mascot.forest-dog.react-wedge{animation:dogListen .5s ease-out}
+  #forest-mascot.react-good{animation:mascotDoubleHop .8s ease-out}
+  #forest-mascot.forest-dog.react-good{animation:dogCelebrate .86s ease-out}
+  #forest-mascot.forest-dog.react-walk{animation:dogWalk 1.05s ease-in-out}
+  @keyframes birdBob{to{transform:var(--face) translateY(-5px) rotate(2deg)}}
+  @keyframes dogBreathe{to{transform:var(--face) translateY(-2px) scale(1.015,.985)}}
+  @keyframes mascotHop{50%{transform:var(--face) translateY(-15px)}}
+  @keyframes mascotBigHop{45%{transform:var(--face) translateY(-24px) scale(1.08)}}
+  @keyframes mascotStartle{35%{transform:var(--face) translateY(-12px) rotate(-7deg)}}
+  @keyframes mascotTilt{50%{transform:var(--face) rotate(-10deg) translateY(-5px)}}
+  @keyframes mascotDoubleHop{25%,75%{transform:var(--face) translateY(-17px)}}
+  @keyframes dogChop{35%{transform:var(--face) translateY(-9px) rotate(-3deg)}65%{transform:var(--face) translateY(-2px) rotate(2deg)}}
+  @keyframes dogCheer{35%{transform:var(--face) translateY(-20px) scale(1.06)}70%{transform:var(--face) translateY(-4px) rotate(4deg)}}
+  @keyframes dogStartle{25%{transform:var(--face) translateY(-13px) rotate(-6deg)}58%{transform:var(--face) translateX(7px) rotate(4deg)}}
+  @keyframes dogListen{45%{transform:var(--face) translateY(-4px) rotate(-9deg)}}
+  @keyframes dogCelebrate{20%,62%{transform:var(--face) translateY(-17px) rotate(-3deg)}40%,82%{transform:var(--face) translateY(-2px) rotate(4deg)}}
+  @keyframes dogWalk{
+    0%{transform:var(--face) translateX(0)}
+    18%{transform:var(--face) translate(18px,-5px) rotate(-2deg)}
+    38%{transform:var(--face) translate(36px,0) rotate(2deg)}
+    58%{transform:var(--face) translate(54px,-5px) rotate(-2deg)}
+    76%{transform:var(--face) translate(68px,0) rotate(2deg)}
+    100%{transform:var(--face) translateX(0)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #forest-mascot,#forest-mascot.forest-dog,#forest-mascot[class*="react-"]{animation:none!important}
+  }
+  .night-wallet{display:flex;align-items:baseline;gap:10px;margin:3px 0 14px;padding:8px 16px;
+    border:1px solid rgba(212,169,78,.26);border-radius:999px;background:rgba(12,12,9,.45)}
+  .night-wallet span{font-size:10px;letter-spacing:.24em;color:var(--nezumi)}
+  .night-wallet b{font-family:'Shippori Mincho',serif;font-size:24px;color:var(--kihada)}
+  .tabico{display:inline-flex;width:17px;height:17px;margin-right:7px;vertical-align:-4px;color:var(--kihada)}
+  .tabico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;
+    stroke-linecap:round;stroke-linejoin:round}
+  #nighttabs{display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
+  #nighttabs button{background:rgba(15,17,15,.62);border-color:rgba(233,227,213,.25)}
+  /* まだ受けていない依頼があるとき。戸口に紙が挟まっている合図 */
+  #nighttabs button.fresh{position:relative;color:var(--kihada);
+    border-color:var(--kihada);background:rgba(212,169,78,.14)}
+  #nighttabs button.fresh .tabico{color:var(--kihada)}
+  #nighttabs button.fresh .dot{position:absolute;top:-3px;right:-3px;width:8px;height:8px;
+    border-radius:50%;background:var(--kihada);box-shadow:0 0 7px rgba(212,169,78,.85);
+    animation:freshPulse 1.7s ease-in-out infinite}
+  @keyframes freshPulse{50%{opacity:.35;transform:scale(.8)}}
+  @media (prefers-reduced-motion:reduce){#nighttabs button.fresh .dot{animation:none}}
+  #nightbody{width:min(920px,96vw);display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+  .shopcard{border:1px solid var(--line);border-radius:3px;padding:16px;background:rgba(255,255,255,.025)}
+  #nightov .shopcard{background:rgba(14,16,14,.60);border-color:rgba(233,227,213,.25);
+    box-shadow:0 7px 18px rgba(0,0,0,.24)}
+  #nightov .shopcard button{background:rgba(24,27,24,.70)}
+  #night-actions{position:relative;z-index:3;margin-top:18px;padding:9px 12px;
+    border-radius:4px;background:rgba(5,7,6,.64);text-align:center}
+  #record-choice{margin-top:8px}
+  .shopcard h3{font-family:'Shippori Mincho',serif;font-size:19px;letter-spacing:.08em;margin-bottom:5px;
+    display:flex;align-items:center;gap:8px}
+  /* 依頼主の絵は黒がほとんどのシルエット（96〜100%が黒画素）。
+     元は白背景向けの絵で、夜の暗い背景に置くと黒が沈んで見えなくなるため反転する。
+     invert で本体が washi 色、輪郭線が沈んだ色になり、暗い背景の上でも読める。 */
+  .client-avatar{width:52px;height:52px;object-fit:contain;object-position:top;
+    filter:invert(1) sepia(.12) saturate(.5) brightness(.97)
+           drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+  .shopcard p{font-size:11px;line-height:1.7;color:#aaa69b;margin-bottom:10px}
+  .shopcard .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:9px;border-top:1px solid var(--line)}
+  .shopcard .row b{font-family:'Shippori Mincho',serif;color:var(--kihada)}
+  #nightmsg{min-height:24px;margin:12px 0;color:var(--moegi);font-size:12px}
+  .stockline{font-size:11px;color:var(--nezumi);line-height:1.8;text-align:center}
+
+  /* 夜の進捗パネル — 記録ボタンの直上に5人固定（ROADMAP §12.10） */
+  #reqboard{position:relative;z-index:3;width:min(560px,94vw);margin:18px auto 0;
+    padding:10px 14px;border-radius:4px;background:rgba(5,7,6,.62);
+    border:1px solid var(--line)}
+  #reqboard:before{content:"依　頼";display:block;font-family:'Shippori Mincho',serif;
+    font-size:10px;letter-spacing:.4em;color:var(--nezumi);text-align:center;margin-bottom:7px}
+  .rb{display:grid;grid-template-columns:6.5em 1fr auto;gap:8px;align-items:baseline;
+    padding:3px 0;font-size:10.5px;line-height:1.6}
+  .rb span{color:var(--nezumi)}
+  .rb b{font-family:'Shippori Mincho',serif;font-size:11.5px;font-weight:600;color:var(--washi)}
+  .rb em{font-style:normal;font-size:10px;color:var(--nezumi);white-space:nowrap}
+  .rb em.ng{color:var(--ake)}
+  .rb.mid b{color:var(--kihada)}
+  .rb.ok b{color:var(--moegi)}
+  .rb.off span,.rb.off b{color:#565a55}
+
+  /* 初対面の挨拶 */
+  #introov{background:rgba(9,11,10,.93);backdrop-filter:blur(4px)}
+  #introcard{width:min(520px,92vw);padding:26px 30px;border-radius:4px;
+    background:rgba(16,19,16,.94);border:1px solid rgba(212,169,78,.3);
+    box-shadow:0 14px 40px rgba(0,0,0,.5)}
+  #introcard .lb{text-align:center;margin-bottom:6px}
+  #intro-art{display:block;height:150px;width:auto;max-width:100%;object-fit:contain;
+    margin:0 auto 12px;filter:invert(1) sepia(.12) saturate(.5) brightness(.97)
+           drop-shadow(0 8px 14px rgba(0,0,0,.4))}
+  #intro-art.hide{display:none}
+  #intro-name{font-size:26px;text-align:center;margin-bottom:20px}
+  #intro-body{font-size:13.5px;line-height:2.1;color:#ddd8ca}
+
+  /* 冒頭の物語と手ほどき。挨拶画面と同じ枠を使い、新しい素材は増やさない */
+  #tutov{background:rgba(9,11,10,.94);backdrop-filter:blur(4px);z-index:44}
+  #tutcard{width:min(560px,92vw);padding:24px 30px 20px;border-radius:4px;
+    background:rgba(16,19,16,.96);border:1px solid rgba(212,169,78,.3);
+    box-shadow:0 14px 40px rgba(0,0,0,.5)}
+  #tutcard .lb{text-align:center;margin-bottom:10px}
+  #tut-title{font-size:19px;text-align:center;margin-bottom:16px;letter-spacing:.12em}
+  #tut-title.hide{display:none}
+  #tut-body{font-size:13px;line-height:1.95;color:#ddd8ca}
+  #tut-body b{color:var(--kihada);font-weight:600}
+  #tut-body g{color:var(--moegi)}
+  /* 冒頭の物語だけは明朝で、行間を広く取る */
+  #tut-body.tu-story{font-family:'Shippori Mincho',serif;font-size:14px;line-height:2.3;
+    text-align:center}
+  .tu-ask{margin-top:22px;font-size:16px;color:var(--washi)}
+  .tu-flow{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 4px;align-items:center;
+    justify-content:center}
+  .tu-flow i{color:var(--nezumi);font-style:normal;font-size:11px}
+  .tu-step{background:rgba(212,169,78,.12);border:1px solid rgba(212,169,78,.3);
+    border-radius:2px;padding:4px 9px;font-size:11.5px;color:var(--washi);white-space:nowrap}
+  .tu-note{font-size:11.5px;color:#a9a498;margin-top:10px;line-height:1.85}
+  .tu-tbl{border-collapse:collapse;margin:6px 0;width:100%;font-size:12px}
+  .tu-tbl td{padding:4px 10px 4px 0;color:#c7c2b6;vertical-align:top}
+  .tu-tbl td:first-child{color:var(--nezumi);white-space:nowrap;width:6.5em}
+  .tu-foot{margin-top:22px;display:flex;align-items:center;justify-content:center;gap:14px}
+  #tut-skip{font-size:9.5px;letter-spacing:.1em;padding:8px 10px;color:var(--nezumi)}
+  @media (max-width:700px){
+    #tutcard{padding:18px 18px 16px}
+    .tu-tbl td:first-child{width:5em}
+  }
+
+  /* 結果 */
+  #result{position:fixed;inset:0;z-index:40;display:none;background:rgba(10,13,11,.95);
+    backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;overflow:auto}
+  #result.show{display:flex}
+  #card2{width:min(440px,92vw);text-align:center}
+  #rank{font-family:'Shippori Mincho',serif;font-weight:800;font-size:88px;line-height:.92}
+  #rsub{font-size:11.5px;letter-spacing:.24em;color:var(--nezumi);margin:5px 0 18px}
+  .rrow{display:grid;grid-template-columns:1fr auto 54px;gap:8px;align-items:baseline;
+    padding:8px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .rrow span:first-child{color:var(--nezumi);text-align:left}
+  .rrow b{font-family:'Shippori Mincho',serif;font-size:15px}
+  .rrow em{font-style:normal;font-size:11px;color:var(--nezumi);text-align:right}
+  #pay{margin-top:18px;font-family:'Shippori Mincho',serif;font-weight:800;font-size:34px}
+  #pay u{font-size:12px;text-decoration:none;color:var(--nezumi);letter-spacing:.14em}
+  #advice{margin-top:14px;font-size:12px;line-height:1.8;color:#b9b5a8;text-align:left;
+    border-left:2px solid var(--kihada);padding-left:12px}
+  #rActs{display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+
+  #hint{position:fixed;bottom:2px;left:50%;transform:translateX(-50%);font-size:9.5px;
+    letter-spacing:.18em;color:var(--nezumi);opacity:.42;z-index:7;pointer-events:none}
+
+  @media (max-width:1180px){ #sect{width:232px;height:182px} }
+  @media (max-width:980px){
+    .rpane{width:200px}
+    #dialbox{width:150px} #dial{width:132px;height:132px} #err{width:132px}
+    #sect{width:202px;height:159px} #vg{width:48px}
+  }
+  @media (max-width:700px){
+    .rpane{right:8px;top:48px;width:150px;padding:8px 10px}
+    .ev .t{display:none} #tc-name{font-size:21px} #tc-price b{font-size:20px}
+    #topbar{gap:14px;padding:8px 12px} #topbar .t{font-size:13px;letter-spacing:.14em}
+    #topbar .m b{font-size:16px}
+    #dialbox{left:8px;bottom:236px;width:118px} #dial{width:104px;height:104px} #err{width:104px}
+    #legend{font-size:8.5px}
+    #cutbox{left:8px;bottom:228px;padding:8px} #sect{width:170px;height:134px} #vg{width:40px}
+    #vg .cap{font-size:8px} #vg-val{font-size:13px}
+    #panel{padding:0 10px 10px} #hint{display:none}
+    .fcard,.ecard{width:100%;max-width:320px}
+    .hearth{left:2%;transform:scale(.72);transform-origin:left bottom}
+    #forest-mascot{left:5px;bottom:178px;width:88px;height:88px}
+  }
+  @media (max-height:860px){
+    #dialbox{top:66px;bottom:auto}
+    #cutbox{top:72px;bottom:auto}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="stage"></div>
+<img id="forest-mascot" class="forest-bird hide" src="assets/bird-mascot.png" alt="森で見守る小鳥">
+
+<div id="topbar">
+  <span class="t" id="tb-place">木こり</span>
+  <div class="m"><span class="lb">日</span><b id="tb-day">1</b></div>
+  <div class="m"><span class="lb">所持金</span><b id="tb-money">0<u> 円</u></b></div>
+  <div class="m"><span class="lb">体力</span><b id="tb-sta">100</b></div>
+  <div class="m" id="tb-edgw"><span class="lb">切れ味</span><b id="tb-edg">100<u>%</u></b></div>
+  <button id="sound-toggle" type="button">音 あり</button>
+  <button id="load-shortcut" type="button">読み込み</button>
+  <div id="quick-loads" class="hide"></div>
+</div>
+
+<div id="eval" class="rpane hide">
+  <div class="hd"><span class="lb">見込み評価</span><b id="e-score">—</b></div>
+  <div id="e-rows"></div>
+</div>
+
+<div id="treecard" class="rpane hide">
+  <div id="tc-empty">木をクリックすると見立てが出る。</div>
+  <div id="tc-body" class="hide">
+    <div id="tc-name">—</div><div id="tc-grade">—</div>
+    <div id="tc-rows"></div>
+    <div id="tc-price"></div>
+    <div id="tc-ft"></div>
+    <div id="tc-dog">犬の見立て：<em>相棒がいれば</em>、外からは見えない芯の腐れを教えてくれる。今はわからない。</div>
+  </div>
+</div>
+
+<div id="dialbox" class="hide">
+  <svg id="dial" viewBox="0 0 170 170">
+    <circle cx="85" cy="85" r="70" fill="rgba(0,0,0,.45)" stroke="rgba(233,227,213,.13)"/>
+    <circle cx="85" cy="85" r="46" fill="none" stroke="rgba(233,227,213,.07)"/>
+    <g id="dticks"></g>
+    <line x1="85" y1="85" x2="85" y2="24" stroke="rgba(233,227,213,.28)" stroke-width="1" stroke-dasharray="2 3"/>
+    <text x="85" y="14" fill="#8b8f88" font-size="8" text-anchor="middle" letter-spacing="1.5">倒れる側</text>
+    <g id="ring"></g>
+    <path id="pred" d="M85 85 L85 29" stroke="#e9e3d5" stroke-width="2.4" fill="none"/>
+    <polygon id="predhead" points="85,20 80,30 90,30" fill="#e9e3d5"/>
+    <polygon points="85,140 79,152 91,152" fill="#d4a94e"/>
+    <text x="85" y="166" fill="#d4a94e" font-size="8" text-anchor="middle" letter-spacing="1.5">自分</text>
+    <circle cx="85" cy="85" r="2.6" fill="#e9e3d5"/>
+  </svg>
+  <div id="legend">
+    <div><i style="color:#7fa85c">●</i>目標に倒す向き</div>
+    <div><i style="color:#e9e3d5">➜</i>予想される倒伏</div>
+    <div><i style="color:#8b8f88">—</i>木の傾き（引く）</div>
+    <div><i style="color:#6f97b5">┈</i>風（押す）</div>
+  </div>
+  <div id="err"><span class="lb">目標とのズレ</span><b id="e-err" class="mn">—</b></div>
+</div>
+
+<div id="cutbox" class="hide">
+  <svg id="sect" viewBox="0 0 280 220"></svg>
+  <div id="vg" class="hide">
+    <div class="cap">入れる<br>高さ</div>
+    <div id="vgbar">
+      <div id="vg-hit"></div><div id="vg-perf"></div>
+      <div id="vg-zero"></div><div id="vg-needle"></div>
+    </div>
+    <div id="vg-val">—</div>
+  </div>
+</div>
+
+<div id="panel"><div id="inner">
+  <div id="phase" class="hide">
+    <div class="ph on" id="p0">1 　向きを決める</div>
+    <div class="ph"    id="p1">2 　受け口</div>
+    <div class="ph"    id="p2">3 　追い口</div>
+  </div>
+  <div id="guide"></div>
+  <div id="say"></div>
+  <div id="gauge" class="hide">
+    <div id="zone"></div><div id="perf"></div><div id="needle"></div>
+    <div class="cap">会心</div>
+  </div>
+  <div id="acts"></div>
+</div></div>
+
+<div id="hint">ドラッグ＝視点 　ホイール＝寄る 　スペース＝斧を振る 　←→＝回す</div>
+
+<!-- 地図 -->
+<div id="mapov" class="ov hide">
+  <img id="map-bg" class="forest-scene" src="assets/forest-0-near.png" alt="">
+  <h1 id="map-h">朝　—　どこへ行くか<span class="daymark" aria-hidden="true"></span></h1>
+  <p class="sub" id="map-sub"></p>
+  <div id="record-loads" class="record-panel"></div>
+  <div id="mapcards"></div>
+  <div style="margin-top:22px"><button id="map-go" class="key">この林へ行く</button> <button id="map-end">今日を終える</button></div>
+</div>
+
+<!-- 一覧表 -->
+<div id="listov" class="ov hide">
+  <h1>見立て一覧</h1>
+  <p class="sub">見出しを押すと並べ替え。行を押すとその木を選ぶ。</p>
+  <div id="ltab"></div>
+  <div style="margin-top:18px"><button id="list-close" class="key">閉じる</button></div>
+</div>
+
+<!-- 夕方 -->
+<div id="evov" class="ov hide">
+  <img id="ev-bg" class="forest-scene" src="assets/forest-0-near.png" alt="">
+  <h1>夕方<span class="daymark" aria-hidden="true"></span></h1>
+  <p class="sub" id="ev-sub"></p>
+  <div id="evcards"></div>
+</div>
+
+<!-- 夜・家 -->
+<div id="nightov" class="ov hide">
+  <div class="night-room" aria-hidden="true">
+    <div class="hearth"></div>
+    <img id="night-dog" class="hide" alt="">
+  </div>
+  <h1>夜・家</h1>
+  <p class="sub" id="night-sub">体力を使わず、明日の支度をする。</p>
+  <div class="night-wallet"><span>財布</span><b id="night-money">0円</b></div>
+  <div id="nighttabs"></div>
+  <div class="stockline" id="night-stock"></div>
+  <div id="nightmsg"></div>
+  <div id="nightbody"></div>
+  <div id="reqboard"></div>
+  <div id="night-actions">
+    <button id="night-record-next" class="key">記録をつけて翌朝へ</button>
+    <button id="night-next">翌朝へ</button>
+    <div id="record-choice" class="hide">
+      <span class="lb">記録先</span>
+      <button data-manual-slot="manual1">記録1</button>
+      <button data-manual-slot="manual2">記録2</button>
+    </div>
+  </div>
+</div>
+
+<!-- 初対面の挨拶 -->
+<div id="introov" class="ov hide">
+  <div id="introcard">
+    <img id="intro-art" alt="">
+    <span class="lb">戸口に立っている</span>
+    <h1 id="intro-name">—</h1>
+    <p id="intro-body"></p>
+    <div style="margin-top:22px;text-align:center"><button id="intro-ok" class="key">話を聞く</button></div>
+  </div>
+</div>
+
+<!-- 冒頭の物語と手ほどき -->
+<div id="tutov" class="ov hide">
+  <div id="tutcard">
+    <span class="lb" id="tut-label"></span>
+    <h1 id="tut-title"></h1>
+    <div id="tut-body"></div>
+    <div class="tu-foot">
+      <button id="tut-ok" class="key">わ　か　っ　た</button>
+      <button id="tut-skip">説明を飛ばす</button>
+    </div>
+  </div>
+</div>
+
+<!-- 結果 -->
+<div id="result"><div id="card2">
+  <div id="rank">—</div><div id="rsub">判定</div>
+  <div id="rrows"></div>
+  <div id="pay">0<u> 円</u></div>
+  <div id="advice"></div>
+  <div id="rActs"></div>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const ri=(a,b)=>Math.floor(rnd(a,b+1));
+const deg=r=>r*180/Math.PI, rad=d=>d*Math.PI/180;
+const GRAV=9.81;
+const yen=n=>n.toLocaleString();
+
+/* ══════════ 樹種・品等 ══════════ */
+</script>
+<script src="src/species.js"></script>
+<script src="src/world.js"></script>
+<script src="src/requests.js"></script>
+<script src="src/physics.js"></script>
+<script src="src/scoring.js"></script>
+<script src="src/ui/dial.js"></script>
+<script src="src/ui/section.js"></script>
+<script src="src/ui/gauge.js"></script>
+<script src="src/ui/map.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/tutorial.js"></script>
+<script src="src/game.js"></script>
+<script src="src/scene3d.js"></script>
+
+
