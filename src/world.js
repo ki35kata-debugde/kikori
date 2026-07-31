@@ -96,6 +96,10 @@ Object.assign(WORLD,{
   mascot:null,            // 昼に映す犬
   storyFlags:{shrineResolve:false,careLesson:false,sakeMigrated:false},
   kamidana:{level:0},
+  /* 全ての依頼を終えた相手に頼める「頼み事」。使うと中2日休み（3日おき）。
+     山主だけは頼んだ翌朝に発動するので ownerFavorPending に予約しておく。 */
+  favors:{builder:{lastDay:null},dealer:{lastDay:null},sakichi:{lastDay:null},owner:{lastDay:null}},
+  ownerFavorPending:null,
   shrine:{started:false,stage:0,submitted:[[],[],[],[],[]],paid:[false,false,false,false,false]},
   ending:{completed:false,day:null,viewed:false},
   unlocks:{doghouse:false,workshop:false,miyama:false,snow:false,master:false},
@@ -147,6 +151,9 @@ function normalizeWorld(){
     ...(WORLD.buildings||{})};
   WORLD.storyFlags={shrineResolve:false,careLesson:false,sakeMigrated:false,...(WORLD.storyFlags||{})};
   WORLD.kamidana={level:0,...(WORLD.kamidana||{})};
+  WORLD.favors={builder:{lastDay:null},dealer:{lastDay:null},sakichi:{lastDay:null},owner:{lastDay:null},
+    ...(WORLD.favors||{})};
+  if(WORLD.ownerFavorPending===undefined)WORLD.ownerFavorPending=null;
   /* お神酒実装前に神主1・2・4を達成した記録にも、未使用分を一度だけ補う。 */
   if(!WORLD.storyFlags.sakeMigrated){
     const earned=['kannushi-1','kannushi-2','kannushi-4']
@@ -264,6 +271,78 @@ function prepareDailyStands(){
 function ensureDailyStands(){
   if(!WORLD.stands||FORESTS.some(f=>!Array.isArray(WORLD.stands[f.id])||WORLD.stands[f.id].length<16))
     prepareDailyStands();
+}
+
+/* ══════════ 頼み事（全依頼達成後の逆依頼） ══════════
+   使うと中2日休み（3日おき）。神主は対象外（依頼そのものに期限がない）。 */
+const FAVOR_COOLDOWN=3;
+const GRADE_LIST=['三等','二等','一等','特等'];
+const gradeIdx=g=>Math.max(0,GRADE_LIST.indexOf(g));
+const gradeAt=i=>GRADE_LIST[clamp(i,0,3)];
+const allRequestsDone=client=>REQUESTS.filter(r=>r.client===client)
+  .every(r=>(WORLD.requestsDone||[]).includes(r.id));
+const favorUnlocked=client=>!!FAVORS[client]&&allRequestsDone(client);
+function favorReady(client){
+  if(!favorUnlocked(client))return false;
+  const last=WORLD.favors[client]?.lastDay;
+  return last==null||WORLD.day-last>=FAVOR_COOLDOWN;
+}
+/* 倉庫の材から、樹種と形（丸太／板）が合うものを拾う。★保持は対象外 */
+function favorLogPool(species,form){
+  return (WORLD.lumber||[]).map((log,index)=>({log,index}))
+    .filter(x=>!x.log.held&&x.log.species===species&&
+      (form==='raw'?(x.log.processed||0)===0:(x.log.processed||0)===1));
+}
+/* 棟梁：数を揃えたい人に、1本をランダムに選んで2本へ割ってもらう。
+   それぞれ等級-1・売価はさらに半分。 */
+function favorSplitLog(species,form){
+  const pool=favorLogPool(species,form);
+  if(!pool.length)return null;
+  const pick=pool[ri(0,pool.length-1)];
+  const src=WORLD.lumber[pick.index];
+  const grade=gradeAt(gradeIdx(src.grade)-1);
+  const value=Math.round(logSaleValue(src)/2/100)*100;
+  const piece=()=>({...src,grade,bornGrade:grade,salePrice:value,held:false});
+  WORLD.lumber.splice(pick.index,1,piece(),piece());
+  return {species,grade};
+}
+/* 材木屋：乾燥待ちが一番長いものを選び、6日分すすめる */
+function favorRushDry(species,form){
+  const pool=favorLogPool(species,form).filter(x=>!x.log.dried)
+    .sort((a,b)=>dryLeft(b.log)-dryLeft(a.log));
+  if(!pool.length)return null;
+  const log=pool[0].log;
+  log.since=(log.since??WORLD.day)-6;
+  const done=WORLD.day-log.since>=dryTotal(log);
+  if(done){log.dried=true;log.grade=nextGrade(log.grade)}
+  return {species,done};
+}
+/* 佐吉：同じ樹種の丸太を安いほうから3本もらい、平均等級の板を1枚 */
+function favorMillBoard(species){
+  const pool=favorLogPool(species,'raw').sort((a,b)=>logSaleValue(a.log)-logSaleValue(b.log));
+  if(pool.length<3)return null;
+  const chosen=pool.slice(0,3);
+  const logs=chosen.map(x=>x.log);
+  const grade=gradeAt(Math.round(logs.reduce((s,l)=>s+gradeIdx(l.grade),0)/3));
+  const value=Math.round(logs.reduce((s,l)=>s+logSaleValue(l),0)/3/100)*100;
+  chosen.map(x=>x.index).sort((a,b)=>b-a).forEach(i=>WORLD.lumber.splice(i,1));
+  const sp=SPECIES[species];
+  WORLD.lumber.push({id:species,species,name:sp.name,grade,bornGrade:grade,rank:null,
+    D:0,volume:0,dried:false,processed:1,furniture:null,held:false,
+    salePrice:value,since:WORLD.day});
+  return {species,grade};
+}
+/* 山主「山の主の威風」：素点の高い順に2本、特等へ格上げ。翌朝に発動する */
+function favorUpgradeForest(forestId){
+  const list=WORLD.stands?.[forestId]; if(!Array.isArray(list))return 0;
+  const cand=list.filter(t=>!t.cut&&t.grade!=='特等')
+    .sort((a,b)=>(b.straight*0.6+(100-b.knots)*0.4)-(a.straight*0.6+(100-a.knots)*0.4))
+    .slice(0,2);
+  for(const t of cand){
+    t.grade='特等';t.gradeMult=1.35;
+    t.price=Math.round(t.volume*SPECIES[t.id].unit*1.35/100)*100;
+  }
+  return cand.length;
 }
 
 /* ══════════ 木の生成 ══════════ */

@@ -194,6 +194,9 @@
     filter:drop-shadow(0 3px 5px rgba(0,0,0,.35))}
   .kai-forecast b{font-size:14px;font-weight:800;line-height:1.2;white-space:nowrap;
     color:var(--kihada);letter-spacing:.02em}
+  .kai-forage-line{display:inline-flex;align-items:center;gap:6px}
+  .kai-forage-face{width:34px;height:34px;object-fit:contain;border-radius:50%;vertical-align:middle;
+    background:rgba(233,227,213,.88);border:1px solid rgba(212,169,78,.75)}
   .forest-go-row{margin:9px 0 12px;display:flex;align-items:flex-end;justify-content:flex-start;gap:10px}
   .fr{display:flex;justify-content:space-between;align-items:center;
     padding:6px 0;border-top:1px solid var(--line);font-size:11px}
@@ -376,17 +379,24 @@
   .shopcard p{font-size:11px;line-height:1.7;color:#aaa69b;margin-bottom:10px}
   .shopcard .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:9px;border-top:1px solid var(--line)}
   .shopcard .row b{font-family:'Shippori Mincho',serif;color:var(--kihada)}
+  .favor-card{border-color:rgba(212,169,78,.4)}
+  .favor-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .favor-grid button{font-size:10.5px;padding:6px 9px}
   .kamidana-card{border-color:rgba(212,169,78,.48)!important}
   .shrine-panel{grid-column:1/-1;display:grid;grid-template-columns:minmax(280px,1.35fr) minmax(250px,.65fr);
     gap:20px;padding:17px;border:1px solid rgba(212,169,78,.38);border-radius:4px;
     background:rgba(10,13,11,.74);box-shadow:0 12px 30px rgba(0,0,0,.34)}
-  .shrine-picture{position:relative;overflow:hidden;min-height:290px;border:1px solid rgba(233,227,213,.2);
+  .shrine-picture{position:relative;overflow:hidden;aspect-ratio:1536/1024;border:1px solid rgba(233,227,213,.2);
     border-radius:3px;background:#171914}
   .shrine-picture img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .shrine-mono{filter:grayscale(1) sepia(.18) brightness(.42) contrast(.88);opacity:.72}
   .shrine-color{position:absolute;inset:0;overflow:hidden;
     clip-path:inset(calc(100% - var(--reveal)) 0 0 0);transition:clip-path .7s ease}
   .shrine-color img{filter:saturate(.82) brightness(.88)}
+  .shrine-part{position:absolute;overflow:hidden}
+  .shrine-part img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+    clip-path:inset(calc(100% - var(--reveal,0%)) 0 0 0);transition:clip-path .7s ease;
+    filter:saturate(.82) brightness(.88)}
   .shrine-copy{display:flex;flex-direction:column;justify-content:center}
   .shrine-copy h2,.shrine-panel>h2{font-family:'Shippori Mincho',serif;font-size:27px;
     letter-spacing:.12em;margin:6px 0 9px}
@@ -396,19 +406,22 @@
     border-top:1px solid var(--line);font-size:12px}
   @media(max-width:720px){
     .shrine-panel{grid-template-columns:1fr}
-    .shrine-picture{min-height:230px}
   }
   .kamidana-card{border-color:rgba(212,169,78,.48)!important}
   .shrine-panel{grid-column:1/-1;display:grid;grid-template-columns:minmax(280px,1.35fr) minmax(250px,.65fr);
     gap:20px;padding:17px;border:1px solid rgba(212,169,78,.38);border-radius:4px;
     background:rgba(10,13,11,.74);box-shadow:0 12px 30px rgba(0,0,0,.34)}
-  .shrine-picture{position:relative;overflow:hidden;min-height:290px;border:1px solid rgba(233,227,213,.2);
+  .shrine-picture{position:relative;overflow:hidden;aspect-ratio:1536/1024;border:1px solid rgba(233,227,213,.2);
     border-radius:3px;background:#171914}
   .shrine-picture img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .shrine-mono{filter:grayscale(1) sepia(.18) brightness(.42) contrast(.88);opacity:.72}
   .shrine-color{position:absolute;inset:0;overflow:hidden;
     clip-path:inset(calc(100% - var(--reveal)) 0 0 0);transition:clip-path .7s ease}
   .shrine-color img{filter:saturate(.82) brightness(.88)}
+  .shrine-part{position:absolute;overflow:hidden}
+  .shrine-part img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+    clip-path:inset(calc(100% - var(--reveal,0%)) 0 0 0);transition:clip-path .7s ease;
+    filter:saturate(.82) brightness(.88)}
   .shrine-copy{display:flex;flex-direction:column;justify-content:center}
   .shrine-copy h2,.shrine-panel>h2{font-family:'Shippori Mincho',serif;font-size:27px;
     letter-spacing:.12em;margin:6px 0 9px}
@@ -418,7 +431,6 @@
     border-top:1px solid var(--line);font-size:12px}
   @media(max-width:720px){
     .shrine-panel{grid-template-columns:1fr}
-    .shrine-picture{min-height:230px}
   }
   .goods-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .goods-top h3{margin:0}
@@ -818,8 +830,8 @@ const yen=n=>n.toLocaleString();
 /* ══════════ 樹種・品等 ══════════ */
 </script>
 <script src="src/species.js?v=20260731-2"></script>
-<script src="src/world.js?v=20260731-17"></script>
-<script src="src/requests.js?v=20260731-18"></script>
+<script src="src/world.js?v=20260801-1"></script>
+<script src="src/requests.js?v=20260801-1"></script>
 <script src="src/physics.js?v=20260731-2"></script>
 <script src="src/scoring.js?v=20260731-2"></script>
 <script src="src/ui/dial.js?v=20260731-2"></script>
@@ -828,7 +840,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-3"></script>
 <script src="src/tutorial.js?v=20260731-3"></script>
-<script src="src/game.js?v=20260731-21"></script>
+<script src="src/game.js?v=20260801-1"></script>
 <script src="src/scene3d.js?v=20260731-2"></script>
 <script>
 (() => {

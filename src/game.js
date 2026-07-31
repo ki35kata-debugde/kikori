@@ -226,13 +226,16 @@ function toMap(){
   const planted=(WORLD.morning.planted||[])
     .map(p=>`${FORESTS[p.forest]?.name} に苗 ${p.n}本`).join('　');
   const seed=planted?`<br><g>${planted}</g>　残り本数と上限が増えた。`:'';
+  const ownerFavor=WORLD.morning.ownerFavor;
+  const ownerLine=ownerFavor
+    ?`<br><g>${FORESTS[ownerFavor.forest]?.name}に山の主の口添えがあった</g>　特等の木が${ownerFavor.n}本増えた。`:'';
   const shrineCare=WORLD.morning.shrineCare;
   const careLine=shrineCare?.level
     ?`<br><g>山の手入れ</g>　自然な荒れ −1　神棚の守り ＋${shrineCare.add}${
       shrineCare.net>0?'　全ての林が1ずつ整った':shrineCare.net===0?'　今日は保たれた':'　今日は守りのない日'}`
     :'';
   $('map-sub').innerHTML=WORLD.moves===0
-    ?`体力 100 ＋${WORLD.morning.carry} 繰り越し ＋${WORLD.morning.bento} 弁当 ＝ <b class="mn">${Math.round(WORLD.stamina)}</b><br>${req}${seed}${careLine}`
+    ?`体力 100 ＋${WORLD.morning.carry} 繰り越し ＋${WORLD.morning.bento} 弁当 ＝ <b class="mn">${Math.round(WORLD.stamina)}</b><br>${req}${seed}${careLine}${ownerLine}`
     :`いまの体力 <b class="mn">${Math.round(WORLD.stamina)}</b>　—　移動するたびに体力を使う。`;
   drawMap(); previewForest(mapChoice); drawRecordSlots(); topbar();
   $('mapov').classList.remove('hide');
@@ -625,7 +628,7 @@ function logSaleValue(log){
   const base=log.salePrice
     ?Math.round(log.salePrice*(gr.mult/born.mult)/100)*100
     :Math.round(log.volume*sp.unit*gr.mult/100)*100;
-  const furnitureMult={座卓:8,椅子:5,風呂桶:6,まな板:4,建具:5,箱:4};
+  const furnitureMult={座卓:8,椅子:5,檜扇:6,曲げ物:5,建具:5,箱:4};
   const mult=log.furniture?(furnitureMult[log.furniture]||4):(log.processed||0)>=1?1.6:1;
   return Math.round(base*mult/100)*100;
 }
@@ -650,7 +653,7 @@ const newRequestWaiting=()=>anyPending()&&canAcceptMore();
 /* ══════════ 夕方 ══════════ */
 const CRAFT_PRODUCTS={
   nara:['座卓','椅子'],
-  hinoki:['風呂桶','まな板'],
+  hinoki:['檜扇','曲げ物'],
   sugi:['建具','箱']
 };
 const craftableLog=log=>(log.processed||0)===0||
@@ -755,20 +758,27 @@ function toEvening(){
   $('ev-bg').className=`forest-scene tone-${eveningForest}`;
   /* 甲斐犬の二段目 — 山菜・きのこを犬が採ってくる。夕方の枠を使わない。
      夕方の1枠は最希少資源なので、これを1つ空けるのが3頭で一番強い（ROADMAP §11.2） */
-  let dogForage=0;
+  let dogForage=0,dogFace='curious';
   if(dogStage('kai')>=2){
     dogForage=[0,0,5,5,10,10,10,15,15,15][ri(0,9)];
     WORLD.carry=Math.max(WORLD.carry,dogForage);
+    dogFace=dogForage>=10?'happy':dogForage>=5?'normal':'curious';
   }
+  /* 採れ高で表情と文面を変える。数字だけより、犬の顔のほうが目に入る（ROADMAP §11.7） */
+  const forageWords=dogForage>=15?'大きな山の恵みを見つけてきたようだ'
+    :dogForage>=10?'木の実をたくさん拾ってきたようだ'
+    :dogForage>=5?'木の実を拾ったようだ'
+    :'今日は何も見つけられなかったようだ';
+  const kaiForageIcon=`<img class="kai-forage-face" src="assets/kai-face-${dogFace}.png" alt="${DOGS.kai.name}">`;
   $('ev-sub').innerHTML=`${WORLD.day}日目が終わる。体力の残り <b class="mn">${Math.round(WORLD.stamina)}</b>　—　選べるのは<b>ひとつだけ</b>。`
-    +(dogStage('kai')>=2?`<br><g>${DOGS.kai.name}が山菜を採ってきた　明日 +${dogForage}</g>　この一枠は使わない。`:'');
+    +(dogStage('kai')>=2?`<br><span class="kai-forage-line">${kaiForageIcon}<g>${DOGS.kai.name}が${forageWords}　明日 +${dogForage}</g></span>　この一枠は使わない。`:'');
   $('evcards').innerHTML=EVE.map((e,i)=>{
     const ok=e.ok();
     /* 犬が採る日は、山菜の札に犬の印を出して「もう済んでいる」ことを示す */
     const byDog=e.k==='forage'&&dogStage('kai')>=2;
     return `<div class="ecard ${ok&&!byDog?'':'dis'}" ${ok&&!byDog?`data-e="${i}"`:''}>
       <h3>${byDog?'🐕 ':''}${e.t}</h3><div class="c">${byDog?'犬が行く':e.c}</div>
-      <div class="e">${byDog?`${DOGS.kai.name}が帰り道で探してくる。こちらの体力も枠も使わない。`:e.e}</div>
+      <div class="e">${byDog?`<span class="kai-forage-line">${kaiForageIcon}${DOGS.kai.name}が${forageWords}</span>`:e.e}</div>
       <div class="k">${byDog?`明日 +${dogForage}　済み`:e.kicker()}</div></div>`}).join('');
   $('evcards').querySelectorAll('[data-e]').forEach(el=>el.onclick=()=>{
     const e=EVE[+el.dataset.e];
@@ -825,6 +835,32 @@ const SHRINE_STAGES=[
     {species:'hinoki',bornGrade:'特等',need:5},
     {species:'hinoki',bornGrade:'一等',dried:true,grade:'特等',need:5}]}
 ];
+/* SHRINE_STAGES と同じ並び。assets/shrine-complete.png（1536×1024）上での
+   各建物の位置を%で持つ。design/calib.html で実測して合わせた値。 */
+const SHRINE_PART_LAYOUT=[
+  {src:'assets/shrine-parts/01-torii.png',  left:11.72,top:64.45,width:18.23,height:32.03},
+  {src:'assets/shrine-parts/02-chozuya.png',left:46.88,top:66.41,width:14.32,height:23.44},
+  {src:'assets/shrine-parts/03-do.png',     left:16.93,top:39.06,width:19.53,height:22.66},
+  {src:'assets/shrine-parts/04-haiden.png', left:45.57,top:38.09,width:24.74,height:23.63},
+  {src:'assets/shrine-parts/05-honden.png', left:63.80,top:14.65,width:23.44,height:32.52}
+];
+/* その建物だけの色づき具合（%）。終えた段階は100、まだ来ていない段階は0、
+   いま進めている段階はその段階の納材率だけ下から色が戻る。 */
+function shrinePartReveal(i){
+  const stage=WORLD.shrine.stage;
+  if(i<stage)return 100;
+  const def=SHRINE_STAGES[i];
+  if(!def)return 100;
+  if(i>stage)return 0;
+  const now=def.parts.reduce((a,p,pi)=>a+shrinePartCount(i,pi),0);
+  const need=def.parts.reduce((a,p)=>a+p.need,0);
+  return need?Math.min(100,now/need*100):0;
+}
+function shrinePartsHTML(){
+  return SHRINE_PART_LAYOUT.map((p,i)=>
+    `<div class="shrine-part" style="left:${p.left}%;top:${p.top}%;width:${p.width}%;height:${p.height}%">
+      <img src="${p.src}" alt="" style="--reveal:${shrinePartReveal(i)}%"></div>`).join('');
+}
 const partLabel=p=>{
   const bits=[SPECIES[p.species]?.name||p.species];
   if(p.bornGrade==='特等')bits.push('伐った時から特等');
@@ -918,7 +954,7 @@ function finishShrineStage(){
       if(active&&reqDone(active))completeRequest(active);
       drawNight();topbar();
       showStory({label:`社の再建　${stage+1}/5`,title:`${def.name}が完成した`,
-        body:stage===2?'堂に、あの日の村人の名を刻んだ。収入も解禁もない。それでも必要な場所だった。'
+        body:stage===2?'堂の石に、震災の向こうに消えた人々の名を刻んだ。\nここでは、何も戻ってはこない。それでも、削れない一段だった。'
           :stage===3?'拝殿が立った。神主が宮大工へ使いを出した。本殿まで、あと一つ。'
           :stage===4?'最後の檜が、宮大工の手で納まった。新しい本殿の屋根に夕日の色が残っている。'
           :'納めた材が柱となり、境内に形が戻った。',
@@ -935,6 +971,9 @@ function showFestivalEnding(){
   showStory({label:'本殿完成',title:'祭りの灯',
     body:'鳥居に注連縄が張られた。\n手水舎に水が戻り、拝殿の前に提灯が並んだ。\n\n笛が鳴る。\n途絶えていた祭りが、もう一度始まった。',
     button:'境内を見る',art:'assets/shrine-complete.png'});
+  showStory({label:'祭りの夜',title:'集った顔ぶれ',
+    body:'すがは屋台の菓子から目を離さず、両手いっぱいに包みを抱えている。\n材木屋のおかみは、大声で笑いながら誰彼構わず盃を注いで回っている。\n佐吉は女房と並んで提灯を見上げ、めずらしく口元がゆるんでいる。\n山の持ち主は、境内をうろつく猫の子を目で追っている。腰は引けているが、逃げてはいない。\n神主は、古い燭台を一つ、懐かしそうに手に取っていた。\n\n柴犬は尾を振り続け、秋田犬は子どもたちにねだられて境内を練り歩き、\n甲斐犬は初めて嗅ぐ祭りの匂いに、鼻を鳴らして駆け回っている。',
+    button:'鳥居のほうへ'});
   showStory({label:'祭りの夜',title:'白い犬',
     body:'祭りの笛が鳴り始めたころ、一頭の白い犬が鳥居をくぐってきた。\n\n神主が、しばらく言葉を失った。\n\n「……前の神主が、神様の使いとして山へ連れていた紀州犬です」\n\n犬は境内をひと回りすると、こちらの前で座った。',
     button:'一緒に山へ行こう',art:dogArt('kishu','mascot')});
@@ -976,8 +1015,15 @@ function updateNightDog(){
     el.style.animation='none';
     el.style.transform='scaleX(-1)';
     if(!DOG_HAS_SLEEP[k]){el.src=dogArt(k,'mascot');return}
-    /* 寝姿は1コマ目だけを使う。元画像のコマずれを完全に避け、静止させる。 */
-    el.src=dogFrame(k,'sleep',0);
+    /* 横中心・足元の位置を全コマ固定した寝息アニメ。ずれが無いのでループできる。 */
+    const cfg=DOG_ANIMS.sleep;let f=0;
+    const breathe=()=>{
+      if(token!==nightDogRunToken||mascotDog()!==k||!WORLD.buildings.doma)return;
+      el.src=dogFrame(k,'sleep',f);
+      f=(f+1)%cfg.frames;
+      nightDogTimer=setTimeout(breathe,cfg.ms);
+    };
+    breathe();
   };
   if(k!=='shiba'){sleep();return}
   el.classList.remove('framed');
@@ -1198,12 +1244,10 @@ function drawNight(){
     body.querySelectorAll('[data-kamidana]').forEach(b=>b.onclick=()=>buildKamidana(+b.dataset.kamidana));
   }else if(NIGHT_TAB==='shrine'){
     const stage=WORLD.shrine.stage,def=SHRINE_STAGES[stage];
-    const submitted=SHRINE_STAGES.reduce((n,_,i)=>n+shrineSubmitted(i).length,0);
-    const reveal=Math.min(100,submitted/30*100);
     if(!def){
       body.innerHTML=`<div class="shrine-panel">
-        <div class="shrine-picture" style="--reveal:100%"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
-          <div class="shrine-color"><img src="assets/shrine-complete.png" alt="完成した社"></div></div>
+        <div class="shrine-picture"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
+          ${shrinePartsHTML()}</div>
         <h2>本殿完成</h2><p>祭りを取り戻した。山での暮らしは、これからも続く。</p>
         <button data-ending>祭りの夜を思い出す</button></div>`;
       body.querySelector('[data-ending]').onclick=showFestivalEnding;
@@ -1213,10 +1257,10 @@ function drawNight(){
         return `<div class="tr"><span>${partLabel(p)}</span><b class="${now>=p.need?'ok':'mid'}">${now} / ${p.need}本</b></div>`;
       }).join('');
       body.innerHTML=`<div class="shrine-panel">
-        <div class="shrine-picture" style="--reveal:${reveal}%"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
-          <div class="shrine-color"><img src="assets/shrine-complete.png" alt="材を納めるほど色が戻る社"></div></div>
+        <div class="shrine-picture"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
+          ${shrinePartsHTML()}</div>
         <div class="shrine-copy"><span class="lb">社の再建　${stage+1} / 5</span><h2>${def.name}</h2>
-          <p>材を納めるたび、景色に色が戻る。建材は「材木倉庫」から一本ずつ納める。</p>
+          <p>材を納めるたび、${def.name}に色が戻る。建材は「材木倉庫」から一本ずつ納める。</p>
           ${parts}<div class="row"><span>職人への謝礼</span><b>${yen(def.money)}円</b></div>
           <button data-finish-shrine ${shrineStageReady(stage)&&WORLD.money>=def.money?'':'disabled'}>${shrineStageReady(stage)?'謝礼を渡して完成させる':'建材を納める'}</button>
         </div></div>`;
@@ -1247,6 +1291,7 @@ function drawNight(){
         <div class="row"><b class="mid">頼まれている</b>
         <button data-accept="${d.id}" ${full?'disabled':''}>${full?'これ以上受けられない':'受ける'}</button></div></div>`;
     }
+    html+=Object.keys(FAVORS).map(favorCardHTML).join('');
     const log=(WORLD.requestLog||[]).slice(0,4).map(e=>{
       const d=reqDef(e.id);if(!d)return '';
       return `<div class="tr"><span>${clientName(d.client)}　${d.title}</span>
@@ -1254,6 +1299,9 @@ function drawNight(){
     if(log)html+=`<div class="shopcard"><h3>済んだこと</h3>${log}</div>`;
     if(!html)html='<div class="shopcard"><h3>依頼</h3><p>いまは頼まれていることがない。</p></div>';
     body.innerHTML=html;
+    body.querySelectorAll('[data-favor]').forEach(b=>b.onclick=()=>requestFavor(b.dataset.favor,
+      {species:b.dataset.species||null,form:b.dataset.form||null,
+       forest:b.dataset.forest!=null?+b.dataset.forest:null}));
     body.querySelectorAll('[data-accept]').forEach(b=>b.onclick=()=>{
       const d=reqDef(b.dataset.accept);
       if(!clientMet(d.client)){showIntro(d.client,()=>{acceptRequest(d.id);drawNight()});return}
@@ -1264,6 +1312,77 @@ function drawNight(){
   }
   $('reqboard').classList.toggle('hide',NIGHT_TAB!=='requests');
   if(NIGHT_TAB==='requests')drawRequestBoard();
+}
+/* ══════════ 頼み事（全依頼達成後の逆依頼） ══════════
+   その依頼主の依頼をすべて終えると解禁。夕方の枠は使わず、
+   お金＋木材で少しだけ手伝ってもらう（world.js の favor* 関数が本体）。 */
+function favorCooldownText(k){
+  const last=WORLD.favors[k]?.lastDay; if(last==null)return '';
+  const wait=FAVOR_COOLDOWN-(WORLD.day-last);
+  return wait>0?`あと${wait}日は休み。`:'';
+}
+function favorCardHTML(k){
+  if(!favorUnlocked(k))return '';
+  const f=FAVORS[k],ready=favorReady(k);
+  let picker='';
+  if(k==='builder'||k==='dealer'){
+    picker=['sugi','hinoki','nara'].flatMap(sp=>['raw','board'].map(fo=>{
+      const pool=favorLogPool(sp,fo).filter(x=>k!=='dealer'||!x.log.dried);
+      const dis=!ready||pool.length<1;
+      return `<button data-favor="${k}" data-species="${sp}" data-form="${fo}" ${dis?'disabled':''}>${
+        SPECIES[sp].name}・${fo==='raw'?'丸太':'板'}(${pool.length})</button>`;
+    })).join('');
+  }else if(k==='sakichi'){
+    picker=['sugi','hinoki','nara'].map(sp=>{
+      const n=favorLogPool(sp,'raw').length,dis=!ready||n<3;
+      return `<button data-favor="${k}" data-species="${sp}" ${dis?'disabled':''}>${SPECIES[sp].name}の丸太(${n})</button>`;
+    }).join('');
+  }else if(k==='owner'){
+    picker=FORESTS.filter(fo=>fo.unlocked).map(fo=>
+      `<button data-favor="${k}" data-forest="${fo.id}" ${ready?'':'disabled'}>${fo.name}</button>`).join('');
+  }
+  const cd=favorCooldownText(k);
+  return `<div class="shopcard favor-card"><h3>${clientAvatar(k)}${clientName(k)}　<span class="lb">頼み事</span></h3>
+    <p>${f.flavor}</p>
+    <div class="favor-grid">${picker}</div>
+    <div class="row"><span>${f.gift}</span><b>${yen(f.cost)}円</b></div>
+    ${!ready&&cd?`<div class="stockline" style="text-align:right">${cd}</div>`:''}</div>`;
+}
+function favorPreviewBody(k,opts){
+  if(k==='builder')return `${SPECIES[opts.species].name}の${opts.form==='raw'?'丸太':'板'}を1本、2本に割ってもらう。\nそれぞれ等級が1段落ち、売価もさらに半分になる。`;
+  if(k==='dealer')return `${SPECIES[opts.species].name}の${opts.form==='raw'?'丸太':'板'}のうち、乾燥待ちが一番長い1本を、6日分乾かしてもらう。`;
+  if(k==='sakichi')return `${SPECIES[opts.species].name}の丸太を3本渡し、平均の等級の板を1枚もらう。`;
+  if(k==='owner')return `${FORESTS[opts.forest].name}へ、明日の朝手を貸してもらう。\n特等でない木のうち、素点の高い上位2本が特等になる。`;
+}
+function favorExecute(k,opts){
+  if(k==='builder')return favorSplitLog(opts.species,opts.form);
+  if(k==='dealer')return favorRushDry(opts.species,opts.form);
+  if(k==='sakichi')return favorMillBoard(opts.species);
+  if(k==='owner'){WORLD.ownerFavorPending=opts.forest;return {forest:opts.forest}}
+  return null;
+}
+function favorResultText(k,result){
+  if(k==='builder')return `${SPECIES[result.species].name}を割ってもらった。${result.grade}が2本、倉庫に増えた。`;
+  if(k==='dealer')return `${SPECIES[result.species].name}を急ぎ乾かしてもらった。${result.done?'そのまま乾き上がった。':'乾燥が6日分すすんだ。'}`;
+  if(k==='sakichi')return `${SPECIES[result.species].name}の板を、平均${result.grade}で挽いてもらった。`;
+  if(k==='owner')return `${FORESTS[result.forest].name}に、明日の朝手が入ることになった。`;
+}
+function requestFavor(k,opts){
+  const f=FAVORS[k];
+  if(!f||!favorReady(k)||WORLD.money<f.cost)return;
+  showStory({label:clientName(k),title:f.title,
+    body:`${favorPreviewBody(k,opts)}\n\n${f.gift}　${yen(f.cost)}円を差し入れる。`,
+    button:'差し入れる',cancel:'やめる',onConfirm:()=>{
+      if(!favorReady(k)||WORLD.money<f.cost)return;
+      const result=favorExecute(k,opts);
+      if(!result){nightMessage('材料が足りず、頼めなかった。',true);drawNight();return}
+      WORLD.money-=f.cost;
+      WORLD.favors[k]={lastDay:WORLD.day};
+      soundSuccess();
+      nightMessage(favorResultText(k,result));
+      saveGame('auto');
+      drawNight();topbar();
+    }});
 }
 /* 解禁物を日本語にする */
 const UNLOCK_LABEL={miyama:'深山へ入れる',doghouse:'犬小屋',snow:'雪の峰へ入れる',
@@ -1502,6 +1621,12 @@ function nextDay(manualSlot=null){
   dailyGrowth();
   WORLD.morning.shrineCare=applyKamidanaCare();
   prepareDailyStands();
+  /* 山主「山の主の威風」は頼んだ翌朝に発動する */
+  if(WORLD.ownerFavorPending!=null){
+    const n=favorUpgradeForest(WORLD.ownerFavorPending);
+    WORLD.morning.ownerFavor=n?{forest:WORLD.ownerFavorPending,n}:null;
+    WORLD.ownerFavorPending=null;
+  }
   const showResolve=WORLD.day===2&&!WORLD.storyFlags.shrineResolve;
   if(showResolve)WORLD.storyFlags.shrineResolve=true;
   saveGame('auto');
