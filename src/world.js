@@ -62,7 +62,7 @@ function advanceBonds(){
       if(WORLD.buildings.doma)passive+=1;
       if(passive&&v<BOND_DOMA_CAP)v=Math.min(BOND_DOMA_CAP,v+passive);
     }
-    if(k===WORLD.dogCare)v+=5;                     // 夜に一緒に遊んだ1頭だけが壁を越える
+    /* 「遊ぶ」の +5 は選んだその場で反映済み。ここでは二重加算しない。 */
     d.bond=clamp(v,0,100);
     if(before<BOND_STAGE2&&d.bond>=BOND_STAGE2)stageUps.push(k);
   }
@@ -91,7 +91,8 @@ Object.assign(WORLD,{
   auto:{bento:true,feed:true},lumber:[],
   buildings:{shed:false,doghouse:false,hearth:false,workshop:false,doma:false},
   dogs:{},                // {shiba:{bond:0}, …}
-  dogCare:null,           // 今夜一緒に遊ぶ1頭
+  dogCare:null,           // 今夜一緒に遊んだ1頭
+  travelPaidToday:[],     // 今日すでに移動体力を払った林
   mascot:null,            // 昼に映す犬
   storyFlags:{shrineResolve:false},
   unlocks:{doghouse:false,workshop:false,miyama:false,snow:false,master:false},
@@ -129,7 +130,7 @@ function plantSaplings(){
 /* 旧セーブは requests を持たない。読み込み後に必ず通す */
 function normalizeWorld(){
   const d={requests:[],requestsDone:[],requestsFailed:[],requestLog:[],
-    pendingRequestResults:[],metClients:[],forestsSeen:[]};
+    pendingRequestResults:[],metClients:[],forestsSeen:[],travelPaidToday:[]};
   for(const k in d)if(!Array.isArray(WORLD[k]))WORLD[k]=d[k];
   WORLD.credit={builder:0,dealer:0,sakichi:0,owner:0,kannushi:0,...(WORLD.credit||{})};
   WORLD.unlocks={doghouse:false,workshop:false,miyama:false,snow:false,master:false,
@@ -156,6 +157,7 @@ function normalizeWorld(){
     if(log.dried==null)log.dried=false;
     if(log.processed==null)log.processed=0;
     if(log.furniture==null)log.furniture=null;
+    if(log.held==null)log.held=false;
   }
   /* v2 の単体 request を新形式へ移す */
   if(WORLD.request){
@@ -190,7 +192,11 @@ const FORESTS=[
    note:'目の詰んだ良材が眠る。ただしあまりに遠い。'}
 ];
 const travelCost=f=>Math.max(Math.min(f.travelBase,10),f.travelBase-f.roadWorks*5);
-const travelPay =f=>Math.max(0,travelCost(f)-(WORLD.moves===0?5:0));
+const travelPay=f=>{
+  const i=FORESTS.indexOf(f);
+  if(i>=0&&(WORLD.travelPaidToday||[]).includes(i))return 0;
+  return Math.max(0,travelCost(f)-(WORLD.moves===0?5:0));
+};
 
 function dailyGrowth(){
   for(const f of FORESTS){

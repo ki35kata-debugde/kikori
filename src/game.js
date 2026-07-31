@@ -1,5 +1,5 @@
 ﻿let SCREEN='map', T=null, S=null, sel=-1, stand=[], sortKey='price', sortDir=-1;
-let mapChoice=0;
+let mapChoice=0,lumberSortKey='price',lumberSortDir=1;
 const FOREST_ART=i=>`assets/forest-${i}-${['near','stream','okuyama','miyama','snow'][i]}.png`;
 const treeEst=t=>Math.max(5,Math.round(t.est/AXES[WORLD.axe].power/5)*5);
 const treePotential=t=>t.potential||(t.defect?'rot':'normal');
@@ -257,13 +257,16 @@ function drawMap(){
       const todo={miyama:'大工の棟梁の依頼を果たすと開く。',
                   snow:'山の持ち主に道をならすよう頼まれている。果たすと開く。'}[f.requires]
                  ||'まだ入る道がない。';
-      return `<div class="fcard lock" data-preview="${i}"><h2>${f.name}</h2>
+      return `<div class="fcard lock ${f.requires==='miyama'&&permitted?'ready':''}" data-preview="${i}"><h2>${f.name}</h2>
+        ${f.requires==='miyama'&&permitted
+          ?`<div style="margin:10px 0 12px"><button class="key" data-buy="${i}" ${can?'':'disabled'}>この林を開く</button></div>`:''}
         <div class="mix">未踏の林</div>
         <div class="note">${f.note}</div>
         ${permitted?'':`<div class="note mid">${todo}</div>`}
         <div class="cost"><em>開くには</em><b class="${affordable?'':'ng'}">${yen(f.price)}</b></div>
         <div class="after">${affordable?'':'お金が足りない'}</div>
-        <div style="margin-top:10px"><button data-buy="${i}" ${can?'':'disabled'}>この林を開く</button></div>
+        ${f.requires==='miyama'&&permitted?''
+          :`<div style="margin-top:10px"><button data-buy="${i}" ${can?'':'disabled'}>この林を開く</button></div>`}
       </div>`}
     const st=stockState(f), tc=travelCost(f), cost=travelPay(f), ok=WORLD.stamina>=cost;
     const roadCut=f.travelBase-tc, mornCut=tc-cost;
@@ -278,9 +281,12 @@ function drawMap(){
     const mix=Object.entries(f.mix).filter(([,v])=>v>0)
       .map(([k,v])=>`${SPECIES[k].name} ${Math.round(v/mixTotal*100)}%`).join('　');
     return `<div class="fcard ${st.c==='ng'?'poor':''} ${mapChoice===i?'chosen':''}" data-go="${i}">
-      <h2>${f.name}</h2><div class="mix">${mix}</div>
+      <h2>${f.name}</h2>
+      <div style="margin:9px 0 12px"><button class="key" data-travel="${i}" ${ok?'':'disabled'}>ここにいく！</button></div>
+      <div class="mix">${mix}</div>
       <div class="fr"><span>手入れ度</span>
-        <span class="meter"><i style="width:${f.care}%;background:${f.care>=70?'#7fa85c':f.care>=40?'#d4a94e':'#c04a32'}"></i></span></div>
+        <span class="meter"><i style="width:${f.care}%;background:${f.care>=70?'#7fa85c':f.care>=40?'#d4a94e':'#c04a32'}"></i></span>
+        <b>${Math.round(f.care)} / 100</b></div>
       <div class="fr"><span>平均の太さ</span><b>${Math.round(f.avgD*100)}cm</b></div>
       <div class="fr"><span>残り本数</span><b class="${st.c}">${f.stock} / ${f.maxStock}</b></div>
       <div class="fr"><span>林の状態</span><b class="${st.c}">${st.n}</b></div>
@@ -299,6 +305,10 @@ function drawMap(){
   });
   $('mapcards').querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
     mapChoice=+el.dataset.go; previewForest(mapChoice); drawMap()});
+  $('mapcards').querySelectorAll('[data-travel]').forEach(el=>el.onclick=e=>{
+    e.stopPropagation();const i=+el.dataset.travel;
+    if(WORLD.stamina>=travelPay(FORESTS[i]))travel(i);
+  });
   $('mapcards').querySelectorAll('[data-buy]').forEach(el=>el.onclick=e=>{
     e.stopPropagation();
     const i=+el.dataset.buy, f=FORESTS[i];
@@ -309,7 +319,10 @@ function drawMap(){
 }
 function travel(i){
   const f=FORESTS[i];
-  WORLD.stamina-=travelPay(f); WORLD.moves++; WORLD.at=i; WORLD.lastForest=i;
+  WORLD.stamina-=travelPay(f);
+  WORLD.travelPaidToday??=[];
+  if(!WORLD.travelPaidToday.includes(i))WORLD.travelPaidToday.push(i);
+  WORLD.moves++; WORLD.at=i; WORLD.lastForest=i;
   /* 訪れた林を覚える。2つ目に入ると山の持ち主が現れる（ROADMAP §12.2） */
   WORLD.forestsSeen??=[]; if(!WORLD.forestsSeen.includes(i))WORLD.forestsSeen.push(i);
   WORLD.forestsToday??=[]; if(!WORLD.forestsToday.includes(i))WORLD.forestsToday.push(i);
@@ -433,7 +446,7 @@ function swing(){
     const wander=Math.abs(h-prev)>3?'<s>切り口が蛇行した。</s>':'';
     const t = hp>16?'まだ余裕がある。':hp>12?'もう少し。'
             : hp>=8?'<g>好機。今なら舵が効く。</g>':'<s>限界。すぐ倒せ。</s>';
-    const hingeGuide=S.backHits.length>=2
+    const hingeGuide=S.backHits.length>=1
       ?'<br><em class="hinge-guide">目標ツル（8〜12％）</em>':'';
     say(`${qs}高さ <b>${h>0?'+':''}${h.toFixed(1)}cm</b>　ツル <b>${hp.toFixed(0)}%</b><br>${wander}${t}${hingeGuide}`);
     setTimeout(()=>{if(S.phase===2)gaugeOn(true)},430);
@@ -556,6 +569,17 @@ function showResult(){
   };
   B(`売る　${yen(pay)}円`,'key',()=>finish('sell',toForest));
   B(`取っておく　${WORLD.lumber.length}/${cap}`,'',()=>finish('keep',toForest),WORLD.lumber.length>=cap);
+  let saplingUsed=false;
+  if(rank==='S')B(`苗木を使う（手入れ＋3）　残り${WORLD.inv.sapling}`,
+    WORLD.inv.sapling>0?'key':'',e=>{
+      if(saplingUsed||WORLD.inv.sapling<1)return;
+      WORLD.inv.sapling--;saplingUsed=true;
+      f.stock=Math.min(f.maxStock+1,f.stock+1);f.maxStock++;f.care=clamp(f.care+3,0,100);
+      e.currentTarget.textContent=`苗木を植えた（手入れ ${Math.round(f.care)}）`;
+      e.currentTarget.disabled=true;e.currentTarget.className='';
+      $('advice').textContent=`苗木を植えた。${f.name}の手入れ度が ${Math.round(f.care)} になり、残り本数と上限も1本増えた。`;
+      topbar();
+    },WORLD.inv.sapling<1);
   /* 合う依頼が複数あることがあるので、相手ごとにボタンを出す */
   for(const r of WORLD.requests){
     if(partIndexFor(r,T)<0)continue;
@@ -581,7 +605,7 @@ const logFromTree=(t,salePrice=0,rank=null)=>({
   grade:t.grade,bornGrade:t.bornGrade||t.grade,
   rank:rank||t.rank||null,D:t.D,volume:t.volume,
   dried:!!t.dried,processed:t.processed||0,furniture:t.furniture||null,
-  salePrice:salePrice||t.salePrice||0});
+  held:!!t.held,salePrice:salePrice||t.salePrice||0});
 function logSaleValue(log){
   const sp=SPECIES[log.species],gr=GRADES.find(x=>x.name===log.grade)||GRADES[GRADES.length-1];
   const born=GRADES.find(x=>x.name===(log.bornGrade||log.grade))||gr;
@@ -748,14 +772,23 @@ function nightMessage(text,bad=false){
   $('nightmsg').textContent=text;
   $('nightmsg').className=bad?'ng':'';
 }
+const goodPrice=k=>k==='stone'&&WORLD.unlocks['cheap-stone']
+  ?Math.floor(GOODS[k].price/2):GOODS[k].price;
 function lumberCount(species){return WORLD.lumber.filter(x=>x.species===species).length}
-function spendLumber(cost){
+function buildLumberPlan(cost){
+  const chosen=[];
   for(const [species,count] of Object.entries(cost)){
-    for(let n=0;n<count;n++){
-      const i=WORLD.lumber.findIndex(x=>x.species===species);
-      if(i>=0)WORLD.lumber.splice(i,1);
-    }
+    const candidates=WORLD.lumber
+      .map((log,index)=>({log,index}))
+      .filter(x=>x.log.species===species&&!x.log.held)
+      .sort((a,b)=>logSaleValue(a.log)-logSaleValue(b.log)||a.index-b.index);
+    if(candidates.length<count)return null;
+    chosen.push(...candidates.slice(0,count));
   }
+  return chosen;
+}
+function spendBuildLumber(plan){
+  [...plan].sort((a,b)=>b.index-a.index).forEach(x=>WORLD.lumber.splice(x.index,1));
 }
 function toNight(){
   SCREEN='night'; hideAll(); NIGHT_TAB='tools'; nightMessage('');
@@ -851,14 +884,15 @@ function drawNight(){
     const GOOD_TEXT={bento:'毎朝 +8体力。自動で使うか切り替えられる。',
       stone:'斧を研ぐ1回分。',
       wedge:'追い口で傾きに逆らう。1本ずつ使う。',
-      sapling:'その日Sを取った本数だけ、夕方に自動で植わる。夕方の枠は使わない。<br>'+
+      sapling:'S評価を取った結果画面で、黄色の「苗木を使う」から植える。<br>'+
               '<b class="ok">1本につき 残り本数+1・上限+1・手入れ度+3</b>'};
     body.innerHTML=Object.entries(GOODS)
       /* 苗は神主の依頼を果たすまで見えない（ROADMAP §12.7） */
       .filter(([k,g])=>!g.locked||WORLD.unlocks[g.locked])
       .map(([k,g])=>`<div class="shopcard">
       <div class="goods-top"><h3>${g.name}　${WORLD.inv[k]}個</h3>
-        <span class="goods-buy"><b>${yen(g.price)}円</b><button data-good="${k}" data-n="1">購入</button></span></div>
+        <span class="goods-buy"><b>${yen(goodPrice(k))}円${
+          k==='stone'&&WORLD.unlocks['cheap-stone']?'（半額）':''}</b><button data-good="${k}" data-n="1">購入</button></span></div>
       <div class="goods-bottom"><p>${GOOD_TEXT[k]||'必要な日に備えて持っておく消耗品。'}${
         k==='bento'?`<br>${WORLD.inv.bento?`明朝 体力 ${WORLD.auto.bento?108:100}／在庫 ${WORLD.inv.bento-(WORLD.auto.bento?1:0)}個`:'弁当がない'}`:''}</p>
       ${k==='bento'?`<button data-auto="${k}" class="${WORLD.auto[k]?'sel':''}" ${WORLD.inv.bento?'':'disabled'}>${WORLD.auto[k]?'明日は食べる':'明日は食べない'}</button>`
@@ -873,9 +907,14 @@ function drawNight(){
         <b class="mid">板に挽く</b>　丸太の売値の <b>1.6倍</b>。<br>
         <b class="mid">家具・道具</b>　乾燥した板をもう一度加工し、種類により
         <b>4〜8倍</b>。加工は工房を建て、夕方に体力20を使う。</p></div>`;
-    body.innerHTML=craftInfo+(WORLD.lumber.length?WORLD.lumber.map((log,i)=>{
+    const speciesOrder={sugi:0,hinoki:1,nara:2};
+    const sorted=WORLD.lumber.map((log,i)=>({log,i})).sort((a,b)=>{
+      const av=lumberSortKey==='species'?(speciesOrder[a.log.species]??9):logSaleValue(a.log);
+      const bv=lumberSortKey==='species'?(speciesOrder[b.log.species]??9):logSaleValue(b.log);
+      return (av-bv)*lumberSortDir||a.i-b.i;
+    });
+    const rows=sorted.map(({log,i})=>{
       const match=requestMatches(log);
-      const who=(WORLD.requests||[]).find(r=>partIndexFor(r,log)>=0);
       /* 乾燥は「あと何日 → 何になる」で書く。割合では何をすべきか伝わらない（SPEC §12.4） */
       const left=dryLeft(log);
       const stage=log.furniture?log.furniture:(log.processed||0)>=1?'板':'丸太';
@@ -886,15 +925,32 @@ function drawNight(){
           ?WORLD.unlocks.furniture?'家具・道具にできる':'佐吉に板を見せる'
           :'板に挽ける'}`
         :`乾燥 <b class="mid">あと ${left}日</b>　→　${nextGrade(log.grade)}`;
-      const born=log.dried&&log.bornGrade!==log.grade
-        ?`　<span class="off">（${log.bornGrade}を寝かせた）</span>`:'';
-      return `<div class="shopcard"><h3>${match?'★ ':''}${log.name}・${log.grade}　${stage}${born}</h3>
-        <p>材積 ${log.volume.toFixed(2)}m³　／　${dry}<br>
-          加工 ${(log.processed||0)}回　／　売値 ${yen(logSaleValue(log))}円</p>
-        <div class="row"><b>${match?`${clientName(who.client)}へ納められる`:'保管中'}</b><span>
-          <button data-sell-log="${i}">${yen(logSaleValue(log))}円で売る</button>
-          ${match?`<button data-deliver-log="${i}">依頼へ納める</button>`:''}</span></div></div>`}).join('')
-      :'<div class="shopcard"><h3>木材はまだない</h3><p>伐ったあとに「取っておく」を選ぶと、ここへ並ぶ。</p></div>');
+      return `<tr>
+        <td><button data-hold-log="${i}" class="${log.held?'sel':''}">保持：${log.held?'🔒':'🔓'}</button></td>
+        <td>${match?'★ ':''}${log.name}</td><td>${log.grade}</td><td>${stage}</td>
+        <td>${dry}</td><td><b class="mid">${yen(logSaleValue(log))}円</b></td>
+        <td><button data-sell-log="${i}">売る</button>${
+          match?` <button data-deliver-log="${i}">依頼へ納める</button>`:''}</td>
+      </tr>`;
+    }).join('');
+    const arrow=k=>lumberSortKey===k?(lumberSortDir>0?' ▲':' ▼'):'';
+    body.innerHTML=craftInfo+`<div class="lumber-panel">
+      <div class="lumber-summary">杉 ${lumberCount('sugi')}本　檜 ${lumberCount('hinoki')}本　楢 ${lumberCount('nara')}本</div>
+      <div class="lumber-table-wrap"><table class="lumber-table">
+        <thead><tr><th>保持</th><th data-lumber-sort="species">種類${arrow('species')}</th>
+          <th>品等</th><th>状態</th><th>乾燥</th>
+          <th data-lumber-sort="price">売価${arrow('price')}</th><th>操作</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="7">木材はまだない</td></tr>'}</tbody>
+      </table></div></div>`;
+    body.querySelectorAll('[data-lumber-sort]').forEach(h=>h.onclick=()=>{
+      const k=h.dataset.lumberSort;
+      if(lumberSortKey===k)lumberSortDir*=-1;else{lumberSortKey=k;lumberSortDir=1}
+      drawNight();
+    });
+    body.querySelectorAll('[data-hold-log]').forEach(b=>b.onclick=()=>{
+      const log=WORLD.lumber[+b.dataset.holdLog];if(!log)return;
+      log.held=!log.held;saveGame('auto');drawNight();
+    });
     body.querySelectorAll('[data-deliver-log]').forEach(b=>b.onclick=()=>deliverStoredLog(+b.dataset.deliverLog));
     body.querySelectorAll('[data-sell-log]').forEach(b=>b.onclick=()=>sellStoredLog(+b.dataset.sellLog));
   }else if(NIGHT_TAB==='dogs'){
@@ -922,7 +978,8 @@ function drawNight(){
         <p><b class="ok">一段目</b>　${d.s1}<br>
            <b class="${st>=2?'ok':'off'}">二段目</b>　<span class="${st>=2?'':'off'}">${d.s2}</span></p>
         <div class="row">
-          <button data-care="${k}" class="${WORLD.dogCare===k?'sel':''}">一緒に遊ぶ</button>
+          <button data-care="${k}" class="${WORLD.dogCare===k?'sel':''}" ${WORLD.dogCare?'disabled':''}>${
+            WORLD.dogCare===k?'遊んだ（+5）':'一緒に遊ぶ（+5）'}</button>
           <button data-mascot="${k}" class="${WORLD.mascot===k?'sel':''}">伐採時に表示</button></div></div>`;
     }
     if(anyDog())html+=`<div class="shopcard"><h3>暮らし</h3>
@@ -941,7 +998,14 @@ function drawNight(){
     body.innerHTML=html;
     body.querySelectorAll('[data-adopt]').forEach(b=>b.onclick=()=>adoptDog(b.dataset.adopt));
     body.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>{
-      WORLD.dogCare=WORLD.dogCare===b.dataset.care?null:b.dataset.care;drawNight()});
+      const k=b.dataset.care,d=WORLD.dogs[k];if(!d||WORLD.dogCare)return;
+      const before=d.bond;d.bond=clamp(d.bond+5,0,100);WORLD.dogCare=k;
+      nightMessage(`${DOGS[k].name}と遊んだ。なつき度 ${before} → ${d.bond}（+${d.bond-before}）`);
+      drawNight();topbar();
+      if(before<BOND_STAGE2&&d.bond>=BOND_STAGE2)showStory({label:'絆が深まった',
+        title:`${DOGS[k].name}が、もっと頼れる相棒になった`,
+        body:DOGS[k].s2.replace(/<[^>]+>/g,''),button:'これからも頼む',art:dogArt(k,'mascot')});
+    });
     body.querySelectorAll('[data-mascot]').forEach(b=>b.onclick=()=>{
       WORLD.mascot=b.dataset.mascot;updateForestMascot();drawNight()});
     body.querySelectorAll('[data-auto="feed"]').forEach(b=>b.onclick=()=>{WORLD.auto.feed=!WORLD.auto.feed;drawNight()});
@@ -953,8 +1017,10 @@ function drawNight(){
       ['hearth','囲炉裏を直す',25000,{nara:2},'楢で炉端を直す。早帰りの上限 20 → 28',true],
       ['workshop','工房',120000,{sugi:6,hinoki:4,nara:3},'加工を解禁',WORLD.unlocks.workshop]
     ];
-    body.innerHTML=builds.map(([k,n,m,c,e,open])=>{
-      const built=WORLD.buildings[k],woodOK=Object.entries(c).every(([s,v])=>lumberCount(s)>=v);
+    body.innerHTML=`<div class="shopcard"><h3>建築に使う材</h3>
+      <p>売価が安いものから使用します。使いたくない材は、先に<b class="mid">「材木倉庫」タブで「保持：🔒」</b>にしてください。保持した木材は建築の対象外です。</p></div>`+
+      builds.map(([k,n,m,c,e,open])=>{
+      const built=WORLD.buildings[k],woodOK=!!buildLumberPlan(c);
       const cost=Object.entries(c).map(([s,v])=>`${SPECIES[s].name}×${v}`).join('、');
       return `<div class="shopcard"><h3>${n}</h3><p>${e}。必要：${cost}</p><div class="row"><b>${yen(m)}円</b><button data-build="${k}" ${built||!open||WORLD.money<m||!woodOK?'disabled':''}>${built?'完成':open?'建てる':'依頼で解禁'}</button></div></div>`}).join('');
     body.querySelectorAll('[data-build]').forEach(b=>b.onclick=()=>buildStructure(b.dataset.build));
@@ -1065,7 +1131,7 @@ function buyAxe(id){
   WORLD.axe=id;soundBuy();nightMessage(`${a.name}を明日の斧にした。`);drawNight();topbar();
 }
 function buyGood(k,n){
-  const price=Math.round(GOODS[k].price*n*(n===10?.9:1));
+  const price=Math.round(goodPrice(k)*n*(n===10?.9:1));
   if(WORLD.money<price){nightMessage('お金が足りない。',true);return}
   WORLD.money-=price;WORLD.inv[k]+=n;soundBuy();nightMessage(`${GOODS[k].name}を ${n}個 買った。`);drawNight();topbar();
 }
@@ -1169,24 +1235,34 @@ function buildStructure(k){
     hearth:[25000,{nara:2}],workshop:[120000,{sugi:6,hinoki:4,nara:3}]
   }[k];
   if(!cfg)return;
-  WORLD.money-=cfg[0];spendLumber(cfg[1]);WORLD.buildings[k]=true;
-  soundSuccess();
-  nightMessage('自分で伐った木で建てた。新しい棚が開いた。');drawNight();topbar();
-  if(k==='workshop')showStory({label:'工房が完成した',title:'木を挽く／削る',
-    body:'夕方に体力20を使い、倉庫の丸太を板に挽ける。\n板は丸太の1.6倍。乾燥した板をもう一度加工すると、家具や道具になり4〜8倍の値がつく。',
-    button:'工房を使ってみる'});
+  const plan=buildLumberPlan(cfg[1]);
+  if(!plan||WORLD.money<cfg[0]){nightMessage('保持していない資材が足りない。',true);drawNight();return}
+  const lines=plan.map(x=>`・${x.log.name}・${x.log.grade}　${yen(logSaleValue(x.log))}円`).join('\n');
+  showStory({label:'建築に使う木材',title:'この資材を使いますか？',
+    body:`売価が安いものから以下の資材を使用します。\n倉庫から保持した木材は対象外です。\n保持は「材木倉庫」タブから設定できます。\n\n${lines}\n\n建築費　${yen(cfg[0])}円`,
+    button:'建てる',cancel:'戻る',onConfirm:()=>{
+      const currentPlan=buildLumberPlan(cfg[1]);
+      if(!currentPlan||WORLD.money<cfg[0]){nightMessage('資材かお金が足りない。',true);drawNight();return}
+      WORLD.money-=cfg[0];spendBuildLumber(currentPlan);WORLD.buildings[k]=true;
+      soundSuccess();
+      nightMessage('自分で伐った木で建てた。新しい棚が開いた。');drawNight();topbar();
+      if(k==='workshop')showStory({label:'工房が完成した',title:'木を挽く／削る',
+        body:'夕方に体力20を使い、倉庫の丸太を板に挽ける。\n板は丸太の1.6倍。乾燥した板をもう一度加工すると、家具や道具になり4〜8倍の値がつく。',
+        button:'工房を使ってみる'});
+    }});
 }
 function nextDay(manualSlot=null){
   /* 神主の依頼後は、日付を問わず一日山へ入らなければ達成。 */
   if(WORLD.today.fells===0&&(WORLD.forestsToday||[]).length===0)
     WORLD.today.keptKamiDay=true;
   noteDayEnd();                 /* 一日の会心・山の神の日を依頼へ反映 */
-  const planted=plantSaplings(); /* Sを取った本数だけ苗が植わる（枠は使わない） */
+  const planted=[];              /* 苗はS評価の結果画面で任意に植える */
   WORLD.day++;
   expireRequests();             /* 期限切れ → 材を返して信用 −1 */
   advanceDrying();              /* 倉庫の材を1日ぶん乾かす */
   WORLD.today={fells:0,esses:0,keptKamiDay:false,essForests:[]};
   WORLD.forestsToday=[];
+  WORLD.travelPaidToday=[];
   const carry=WORLD.carry;
   let lunch=0;
   if(WORLD.auto.bento&&WORLD.inv.bento>0){WORLD.inv.bento--;lunch=8}

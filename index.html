@@ -182,6 +182,7 @@
   .fcard:hover:not(.lock){border-color:var(--kihada);background:rgba(212,169,78,.07);transform:translateY(-3px)}
   .fcard.chosen{border-color:var(--kihada);background:rgba(212,169,78,.12);box-shadow:0 0 0 1px rgba(212,169,78,.2)}
   .fcard.lock{opacity:.5;cursor:default}
+  .fcard.lock.ready{opacity:1;border-color:var(--kihada);background:rgba(212,169,78,.08)}
   .fcard.poor{border-color:rgba(192,74,50,.35)}
   .fcard h2{font-family:'Shippori Mincho',serif;font-weight:800;font-size:22px;letter-spacing:.1em}
   .fcard .mix{font-size:10px;color:var(--nezumi);letter-spacing:.16em;margin:2px 0 12px}
@@ -376,6 +377,15 @@
   #nightov button{white-space:normal}
   #nightmsg{min-height:24px;margin:12px 0;color:var(--moegi);font-size:12px}
   .stockline{font-size:11px;color:var(--nezumi);line-height:1.8;text-align:center}
+  .lumber-panel{grid-column:1/-1;width:100%}
+  .lumber-summary{margin-bottom:9px;color:var(--kihada);font-family:'Shippori Mincho',serif;
+    font-size:14px;letter-spacing:.08em}
+  .lumber-table-wrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:3px}
+  .lumber-table{min-width:760px;background:rgba(8,11,9,.58)}
+  .lumber-table th,.lumber-table td{text-align:left;vertical-align:middle}
+  .lumber-table th:nth-child(6),.lumber-table td:nth-child(6){text-align:right}
+  .lumber-table tr{cursor:default}
+  .lumber-table button{padding:7px 9px;font-size:10px}
 
   /* 夜の進捗パネル — 記録ボタンの直上に5人固定（ROADMAP §12.10） */
   #reqboard{position:relative;z-index:3;width:min(560px,94vw);margin:18px auto 0;
@@ -738,7 +748,7 @@ const yen=n=>n.toLocaleString();
 /* ══════════ 樹種・品等 ══════════ */
 </script>
 <script src="src/species.js?v=20260731-2"></script>
-<script src="src/world.js?v=20260731-11"></script>
+<script src="src/world.js?v=20260731-15"></script>
 <script src="src/requests.js?v=20260731-11"></script>
 <script src="src/physics.js?v=20260731-2"></script>
 <script src="src/scoring.js?v=20260731-2"></script>
@@ -748,7 +758,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-2"></script>
 <script src="src/tutorial.js?v=20260731-2"></script>
-<script src="src/game.js?v=20260731-13"></script>
+<script src="src/game.js?v=20260731-15"></script>
 <script src="src/scene3d.js?v=20260731-2"></script>
 <script>
 (() => {
