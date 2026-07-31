@@ -11,7 +11,7 @@
      神主        … 年若く、静か。一番短く、**問いで終わる**                        */
 
 /* 未実装の仕組み。false の間、それに依存する依頼は出さない（§12.1 の require の一種） */
-const SYSTEMS={dry:true,craft:false,sake:false,shrine:false};
+const SYSTEMS={dry:true,craft:true,sake:false,shrine:false};
 
 const CLIENTS={
   builder:{key:'builder',name:'大工の棟梁',
@@ -288,6 +288,8 @@ function completeRequest(r){
   (d.unlocks||[]).forEach(applyUnlock);
   WORLD.requests=WORLD.requests.filter(x=>x!==r);
   WORLD.requestLog.unshift({id:r.id,day:WORLD.day,ok:true});
+  WORLD.pendingRequestResults??=[];
+  WORLD.pendingRequestResults.push({id:r.id,day:WORLD.day});
 }
 function expireRequests(){
   for(const r of [...(WORLD.requests||[])]){

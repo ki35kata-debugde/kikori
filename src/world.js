@@ -104,6 +104,7 @@ Object.assign(WORLD,{
   requestsDone:[],        // 達成した依頼の id
   requestsFailed:[],      // 期限切れにした依頼の id
   requestLog:[],          // 済んだこと（新しい順）
+  pendingRequestResults:[], // 依頼タブでまだ見せていない達成結果
   credit:{builder:0,dealer:0,sakichi:0,owner:0,kannushi:0},
   metClients:[],          // 自己紹介を出した相手
   forestsSeen:[],         // 訪れた林の id（山の持ち主の登場条件）
@@ -128,7 +129,7 @@ function plantSaplings(){
 /* 旧セーブは requests を持たない。読み込み後に必ず通す */
 function normalizeWorld(){
   const d={requests:[],requestsDone:[],requestsFailed:[],requestLog:[],
-    metClients:[],forestsSeen:[]};
+    pendingRequestResults:[],metClients:[],forestsSeen:[]};
   for(const k in d)if(!Array.isArray(WORLD[k]))WORLD[k]=d[k];
   WORLD.credit={builder:0,dealer:0,sakichi:0,owner:0,kannushi:0,...(WORLD.credit||{})};
   WORLD.unlocks={doghouse:false,workshop:false,miyama:false,snow:false,master:false,
@@ -153,6 +154,8 @@ function normalizeWorld(){
     if(log.since==null)log.since=WORLD.day;
     if(log.bornGrade==null)log.bornGrade=log.grade;
     if(log.dried==null)log.dried=false;
+    if(log.processed==null)log.processed=0;
+    if(log.furniture==null)log.furniture=null;
   }
   /* v2 の単体 request を新形式へ移す */
   if(WORLD.request){
