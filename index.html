@@ -40,10 +40,10 @@
   #topbar .m b u{font-size:10px;text-decoration:none;color:var(--nezumi)}
   #sound-toggle,#load-shortcut{padding:7px 9px;font-size:9px;letter-spacing:.12em;border-radius:999px}
   #sound-toggle.off{color:var(--nezumi)}
-  #quick-loads{position:absolute;right:18px;top:48px;z-index:40;width:230px;
+  #quick-loads{position:absolute;right:18px;top:48px;z-index:40;width:min(360px,92vw);
     padding:9px;background:rgba(10,13,11,.96);border:1px solid var(--line);
     box-shadow:0 9px 24px rgba(0,0,0,.45)}
-  #quick-loads button{display:block;width:100%;margin-top:5px;text-align:left}
+  #quick-loads button{display:block;width:100%;margin-top:5px;text-align:left;white-space:normal;line-height:1.45}
 
   /* 右パネル */
   .rpane{position:fixed;top:56px;right:18px;z-index:5;width:246px;
@@ -206,6 +206,7 @@
   .record-panel{display:flex;gap:7px;align-items:center;justify-content:center;flex-wrap:wrap;
     margin:-12px 0 16px;padding:8px 10px;border-radius:3px;background:rgba(10,13,11,.72)}
   .record-panel .lb{margin-right:4px}
+  .record-panel button{white-space:normal;line-height:1.45}
 
   /* 一覧表 */
   #mapov,#listov,#evov{justify-content:flex-start;padding-top:72px}
@@ -357,6 +358,8 @@
   .client-avatar{width:52px;height:52px;object-fit:contain;object-position:top;
     filter:invert(1) sepia(.12) saturate(.5) brightness(.97)
            drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+  .dog-card-art{float:right;width:92px;height:92px;object-fit:contain;margin:-7px -5px 7px 10px;
+    filter:drop-shadow(0 5px 8px rgba(0,0,0,.42))}
   .shopcard p{font-size:11px;line-height:1.7;color:#aaa69b;margin-bottom:10px}
   .shopcard .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:9px;border-top:1px solid var(--line)}
   .shopcard .row b{font-family:'Shippori Mincho',serif;color:var(--kihada)}
@@ -399,6 +402,17 @@
   #intro-art.hide{display:none}
   #intro-name{font-size:26px;text-align:center;margin-bottom:20px}
   #intro-body{font-size:13.5px;line-height:2.1;color:#ddd8ca}
+
+  #storyov{background:rgba(9,11,10,.94);backdrop-filter:blur(5px);z-index:46}
+  #storycard{width:min(520px,92vw);padding:26px 30px;border-radius:4px;text-align:center;
+    background:rgba(16,19,16,.97);border:1px solid rgba(212,169,78,.34);
+    box-shadow:0 14px 40px rgba(0,0,0,.55)}
+  #storycard .lb{display:block;margin-bottom:7px}
+  #story-title{font-size:23px;line-height:1.5;margin-bottom:15px}
+  #story-body{white-space:pre-line;font-family:'Shippori Mincho',serif;font-size:14px;
+    line-height:2.15;color:#ddd8ca}
+  #story-art{display:block;width:150px;height:150px;object-fit:contain;margin:0 auto 8px;
+    filter:drop-shadow(0 7px 12px rgba(0,0,0,.45))}
 
   /* 冒頭の物語と手ほどき。挨拶画面と同じ枠を使い、新しい素材は増やさない */
   #tutov{background:rgba(9,11,10,.94);backdrop-filter:blur(4px);z-index:44}
@@ -657,6 +671,17 @@
   </div>
 </div>
 
+<!-- 物語の節目・犬との出会い -->
+<div id="storyov" class="ov hide">
+  <div id="storycard">
+    <img id="story-art" class="hide" alt="">
+    <span class="lb" id="story-label"></span>
+    <h1 id="story-title"></h1>
+    <p id="story-body"></p>
+    <div style="margin-top:22px"><button id="story-ok" class="key">わかった</button></div>
+  </div>
+</div>
+
 <!-- 冒頭の物語と手ほどき -->
 <div id="tutov" class="ov hide">
   <div id="tutcard">
@@ -692,7 +717,7 @@ const yen=n=>n.toLocaleString();
 /* ══════════ 樹種・品等 ══════════ */
 </script>
 <script src="src/species.js?v=20260731-2"></script>
-<script src="src/world.js?v=20260731-2"></script>
+<script src="src/world.js?v=20260731-4"></script>
 <script src="src/requests.js?v=20260731-2"></script>
 <script src="src/physics.js?v=20260731-2"></script>
 <script src="src/scoring.js?v=20260731-2"></script>
@@ -702,7 +727,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-2"></script>
 <script src="src/tutorial.js?v=20260731-2"></script>
-<script src="src/game.js?v=20260731-3"></script>
+<script src="src/game.js?v=20260731-4"></script>
 <script src="src/scene3d.js?v=20260731-2"></script>
 <script>
 (() => {

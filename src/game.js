@@ -13,11 +13,13 @@ const DOG_ANIMS={
   idle:{frames:4,ms:420,loop:true},
   joy:{frames:6,ms:130,loop:false},
   inspect:{frames:5,ms:220,loop:false},
-  fail:{frames:5,ms:240,loop:false}
+  fail:{frames:5,ms:240,loop:false},
+  sleep:{frames:4,ms:520,loop:true}
 };
 let dogAnimToken=0,dogAnimTimer=null;
 const dogFrame=(k,state,i)=>`assets/${k}-animation/${state}/${i}.png`;
 const DOG_HAS_FRAMES={};
+const DOG_HAS_SLEEP={};
 for(const k of ['shiba','akita','kai','kishu']){
   const probe=new Image();
   probe.onload=()=>{
@@ -27,6 +29,9 @@ for(const k of ['shiba','akita','kai','kishu']){
     if(typeof mascotDog==='function'&&mascotDog()===k&&SCREEN!=='night')updateForestMascot();
   };
   probe.src=dogFrame(k,'idle',0);
+  const sleepProbe=new Image();
+  sleepProbe.onload=()=>{DOG_HAS_SLEEP[k]=true;if(SCREEN==='night')updateNightDog()};
+  sleepProbe.src=dogFrame(k,'sleep',0);
 }
 function stopDogAnimation(){
   dogAnimToken++;
@@ -177,6 +182,23 @@ function hideAll(){
   /* 選択の輪は林のグリッド上の座標を持つ。伐倒中は木が原点へ移るので、
      消さないと輪だけ横に取り残される */
   ringSel.visible=false; ringHov.visible=false;
+}
+const STORY_QUEUE=[];
+function showStory({label='',title='',body='',button='わかった',art=null}){
+  if(!$('storyov').classList.contains('hide')){
+    STORY_QUEUE.push({label,title,body,button,art});return;
+  }
+  $('story-label').textContent=label;
+  $('story-title').textContent=title;
+  $('story-body').textContent=body;
+  $('story-ok').textContent=button;
+  const img=$('story-art');
+  if(art){img.src=art;img.classList.remove('hide')}else{img.src='';img.classList.add('hide')}
+  $('storyov').classList.remove('hide');
+  $('story-ok').onclick=()=>{
+    $('storyov').classList.add('hide');
+    const next=STORY_QUEUE.shift();if(next)showStory(next);
+  };
 }
 function toMap(){
   SCREEN='map'; hideAll(); gaugeOff();
@@ -665,14 +687,8 @@ function toNight(){
   $('nightov').classList.remove('hide'); drawNight(); topbar();soundNight();
   showTutorial('night');
 }
-/* 土間を直すと、犬が家の中（囲炉裏のそば）に見えるようになる。
-   待機の絵で十分（ROADMAP §11.7・SPEC §16.6の未実装ぶんを埋める） */
+/* 土間を直すと、犬が家の中（囲炉裏のそば）で眠る。 */
 let nightDogTimer=null;
-/* 土間で休む犬。コマ絵がある犬（いまは柴犬だけ）は待機↔喜びを繰り返す。
-   まだ絵が無い犬（秋田犬・甲斐犬・紀州犬）は1枚絵のまま
-   （CSSの nightDogPatrol が左右へゆっくり動かす）。
-   寝息のコマ絵ができたら 'sleep' を NIGHT_DOG_CYCLE に足すだけで切り替わる。 */
-const NIGHT_DOG_CYCLE=['idle','idle','idle','joy'];
 function updateNightDog(){
   const el=$('night-dog'); if(!el)return;
   const k=mascotDog();
@@ -681,23 +697,15 @@ function updateNightDog(){
   el.onerror=()=>el.classList.add('hide');
   el.alt=`土間で休む${DOGS[k].name}`;
   el.classList.remove('hide');
-  if(!DOG_HAS_FRAMES[k]){el.classList.remove('framed');el.src=dogArt(k,'mascot');return}
-  el.classList.add('framed');   /* コマ送り中は CSS の左右移動を止める */
-  let i=0;
-  const step=()=>{
-    if(mascotDog()!==k||!WORLD.buildings.doma){return}
-    const state=NIGHT_DOG_CYCLE[i%NIGHT_DOG_CYCLE.length]; i++;
-    const cfg=DOG_ANIMS[state];
-    let f=0;
-    const frame=()=>{
-      if(mascotDog()!==k)return;
-      el.src=dogFrame(k,state,f); f++;
-      if(f<cfg.frames){nightDogTimer=setTimeout(frame,cfg.ms);return}
-      nightDogTimer=setTimeout(step,state==='joy'?1400:2200);
-    };
-    frame();
+  if(!DOG_HAS_SLEEP[k]){el.classList.remove('framed');el.src=dogArt(k,'mascot');return}
+  el.classList.add('framed');
+  let f=0;
+  const frame=()=>{
+    if(mascotDog()!==k||!WORLD.buildings.doma)return;
+    el.src=dogFrame(k,'sleep',f);f=(f+1)%DOG_ANIMS.sleep.frames;
+    nightDogTimer=setTimeout(frame,DOG_ANIMS.sleep.ms);
   };
-  step();
+  frame();
 }
 const TAB_ICONS={
   tools:'<path d="M5 15l6-6m-1-4l4-2 2 2-2 4-4-4zM3 17l3-3"/>',
@@ -771,7 +779,8 @@ function drawNight(){
       const got=hasDog(k),st=dogStage(k),b=dogBond(k);
       const locked=d.unlock&&!WORLD.unlocks[d.unlock];
       if(!got){
-        html+=`<div class="shopcard"><h3>${d.name}</h3>
+        html+=`<div class="shopcard dog-card"><img class="dog-card-art" src="${dogArt(k,'mascot')}" alt="${d.name}">
+          <h3>${d.name}</h3>
           <p>${d.role}。<br>${locked?'<span class="mid">まだ訪ねてこない。</span>'
             :!WORLD.buildings.doghouse?'<span class="mid">犬小屋を建てると迎えられる。</span>'
             :'一段目：'+d.s1}</p>
@@ -780,7 +789,8 @@ function drawNight(){
         continue;
       }
       const pct=Math.round(b/BOND_STAGE2*100);
-      html+=`<div class="shopcard"><h3>${d.name}　<span class="lb" style="display:inline">${d.role}</span></h3>
+      html+=`<div class="shopcard dog-card"><img class="dog-card-art" src="${dogArt(k,'mascot')}" alt="${d.name}">
+        <h3>${d.name}　<span class="lb" style="display:inline">${d.role}</span></h3>
         <div class="tr"><span>なつき度</span>
           <span class="meter" style="width:110px"><i style="width:${Math.min(100,pct)}%;background:${
             st>=2?'#7fa85c':'#d4a94e'}"></i></span>
@@ -993,6 +1003,9 @@ function adoptDog(k){
   soundSuccess();
   nightMessage(`${d.name}を迎えた。明日から山へついてくる。`);
   drawNight();topbar();
+  showStory({label:'新しい相棒',title:d.name,
+    body:`${d.name}を家へ迎えた。\n明日から山へついてくる。`,
+    button:'よろしくな',art:dogArt(k,'mascot')});
 }
 function mascotReact(kind){
   const el=$('forest-mascot');
@@ -1042,9 +1055,19 @@ function nextDay(manualSlot=null){
   WORLD.moves=0; WORLD.at=-1;
   dailyGrowth();
   prepareDailyStands();
+  const showResolve=WORLD.day===2&&!WORLD.storyFlags.shrineResolve;
+  if(showResolve)WORLD.storyFlags.shrineResolve=true;
   saveGame('auto');
   if(manualSlot)saveGame(manualSlot);
   toMap();
+  if(showResolve)showStory({label:'二日目の朝',title:'あの日の祭りを、もう一度',
+    body:'夜明け前、倒れた社と、祭りの灯が夢に出た。\n社を再興して、あの日の祭りを取り戻したい。',
+    button:'山へ向かう'});
+  for(const k of bonds?.stageUps||[]){
+    const d=DOGS[k];if(!d)continue;
+    showStory({label:'絆が深まった',title:`${d.name}が、もっと頼れる相棒になった`,
+      body:d.s2.replace(/<[^>]+>/g,''),button:'これからも頼む',art:dogArt(k,'mascot')});
+  }
 }
 $('night-next').onclick=()=>nextDay();
 $('night-record-next').onclick=()=>$('record-choice').classList.toggle('hide');
@@ -1067,7 +1090,9 @@ function recordText(slot){
   const d=readRecord(slot);
   if(!d?.world)return slot==='auto'?'自動記録　なし':`${slot==='manual1'?'記録1':'記録2'}　なし`;
   const name=slot==='auto'?'自動記録':slot==='manual1'?'記録1':'記録2';
-  return `${name}　${d.world.day}日目`;
+  const dogNames={shiba:'柴',kai:'甲斐',akita:'秋田'};
+  const dogs=Object.keys(d.world.dogs||{}).map(k=>dogNames[k]||k).join('・')||'なし';
+  return `${name}　${d.world.day}日目　状況：${yen(d.world.money??0)}円　犬：${dogs}`;
 }
 function drawRecordSlots(){
   const buttons=['auto','manual1','manual2'].map(slot=>{

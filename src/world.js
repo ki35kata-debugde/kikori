@@ -47,9 +47,11 @@ function advanceBonds(){
   const fed=Math.min(want,WORLD.inv.feed);
   WORLD.inv.feed-=fed;
   const short=want>0&&fed<n;
+  const stageUps=[];
   for(const k in WORLD.dogs){
     const d=WORLD.dogs[k];
-    let v=d.bond;
+    const before=d.bond;
+    let v=before;
     if(short)v-=5;
     else{
       /* 餌と土間は放っておいても効くぶん。どちらも 59 で止まる。
@@ -62,9 +64,10 @@ function advanceBonds(){
     }
     if(k===WORLD.dogCare)v+=5;                     // 夜に一緒に遊んだ1頭だけが壁を越える
     d.bond=clamp(v,0,100);
+    if(before<BOND_STAGE2&&d.bond>=BOND_STAGE2)stageUps.push(k);
   }
   const tended=WORLD.dogCare; WORLD.dogCare=null;
-  return {fed,want,short,tended};
+  return {fed,want,short,tended,stageUps};
 }
 
 /* ══════════ 乾燥（ROADMAP §11.3） ══════════
@@ -90,6 +93,7 @@ Object.assign(WORLD,{
   dogs:{},                // {shiba:{bond:0}, …}
   dogCare:null,           // 今夜一緒に遊ぶ1頭
   mascot:null,            // 昼に映す犬
+  storyFlags:{shrineResolve:false},
   unlocks:{doghouse:false,workshop:false,miyama:false,snow:false,master:false},
   morning:{carry:0,bento:0},
   stands:{},pendingCut:null
@@ -136,6 +140,7 @@ function normalizeWorld(){
   delete WORLD.inv.incense; delete WORLD.auto?.incense; delete WORLD.incenseRun;
   WORLD.buildings={shed:false,doghouse:false,hearth:false,workshop:false,doma:false,
     ...(WORLD.buildings||{})};
+  WORLD.storyFlags={shrineResolve:false,...(WORLD.storyFlags||{})};
   /* 旧セーブの WORLD.dog（'shiba' か true）を3頭形式へ移す */
   if(typeof WORLD.dogs!=='object'||WORLD.dogs===null)WORLD.dogs={};
   if(WORLD.dog&&!WORLD.dogs.shiba)WORLD.dogs.shiba={bond:0};
@@ -218,4 +223,3 @@ function ensureDailyStands(){
 }
 
 /* ══════════ 木の生成 ══════════ */
-
