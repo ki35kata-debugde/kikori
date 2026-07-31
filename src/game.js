@@ -766,14 +766,6 @@ function toNight(){
 }
 /* 土間を直すと、犬が家の中（囲炉裏のそば）で眠る。 */
 let nightDogTimer=null,nightDogRunToken=0;
-/* 寝姿の元画像は透明キャンバス内の位置がコマごとに違う。
-   犬本体の中心と足元を揃える表示補正（px）。 */
-const DOG_SLEEP_OFFSETS={
-  /* scaleX(-1) の後に見た補正なので、元画像の左右差と逆向きに動かす。 */
-  shiba:[[5,0],[-5,0],[4,21],[-5,20]],
-  akita:[[4,0],[-4,0],[4,27],[-4,27]],
-  kai:[[3,0],[-2,0],[3,17],[-4,16]]
-};
 function updateNightDog(){
   const el=$('night-dog'); if(!el)return;
   const k=mascotDog();
@@ -798,15 +790,8 @@ function updateNightDog(){
     el.style.animation='none';
     el.style.transform='scaleX(-1)';
     if(!DOG_HAS_SLEEP[k]){el.src=dogArt(k,'mascot');return}
-    let f=0;
-    const sleepFrame=()=>{
-      if(token!==nightDogRunToken||mascotDog()!==k||!WORLD.buildings.doma)return;
-      const [dx,dy]=(DOG_SLEEP_OFFSETS[k]||[])[f]||[0,0];
-      el.style.transform=`translate(${dx}px,${dy}px) scaleX(-1)`;
-      el.src=dogFrame(k,'sleep',f);f=(f+1)%DOG_ANIMS.sleep.frames;
-      nightDogTimer=setTimeout(sleepFrame,DOG_ANIMS.sleep.ms);
-    };
-    sleepFrame();
+    /* 寝姿は1コマ目だけを使う。元画像のコマずれを完全に避け、静止させる。 */
+    el.src=dogFrame(k,'sleep',0);
   };
   if(k!=='shiba'){sleep();return}
   el.classList.remove('framed');
