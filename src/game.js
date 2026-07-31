@@ -433,7 +433,9 @@ function swing(){
     const wander=Math.abs(h-prev)>3?'<s>切り口が蛇行した。</s>':'';
     const t = hp>16?'まだ余裕がある。':hp>12?'もう少し。'
             : hp>=8?'<g>好機。今なら舵が効く。</g>':'<s>限界。すぐ倒せ。</s>';
-    say(`${qs}高さ <b>${h>0?'+':''}${h.toFixed(1)}cm</b>　ツル <b>${hp.toFixed(0)}%</b><br>${wander}${t}`);
+    const hingeGuide=S.backHits.length>=2
+      ?'<br><em class="hinge-guide">目標ツル（8〜12％）</em>':'';
+    say(`${qs}高さ <b>${h>0?'+':''}${h.toFixed(1)}cm</b>　ツル <b>${hp.toFixed(0)}%</b><br>${wander}${t}${hingeGuide}`);
     setTimeout(()=>{if(S.phase===2)gaugeOn(true)},430);
   }
   refresh(); buildActs();
