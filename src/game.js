@@ -292,7 +292,7 @@ function drawMap(){
       .map(([k,v])=>`${SPECIES[k].name} ${Math.round(v/mixTotal*100)}%`).join('　');
     return `<div class="fcard ${st.c==='ng'?'poor':''} ${mapChoice===i?'chosen':''}" data-go="${i}">
       <h2 class="forest-title"><span>${f.name}</span></h2>
-      <div class="forest-go-row">${kaiForecast(f)}<button class="key" data-travel="${i}" ${ok?'':'disabled'}>ここにいく！</button></div>
+      <div class="forest-go-row"><button class="key" data-travel="${i}" ${ok?'':'disabled'}>ここにいく！</button>${kaiForecast(f)}</div>
       <div class="mix">${mix}</div>
       <div class="fr"><span>手入れ度</span>
         <span class="meter"><i style="width:${f.care}%;background:${f.care>=70?'#7fa85c':f.care>=40?'#d4a94e':'#c04a32'}"></i></span>
