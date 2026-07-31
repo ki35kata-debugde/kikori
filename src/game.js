@@ -213,6 +213,7 @@ function showStory({label='',title='',body='',button='わかった',cancel=null,
 }
 function toMap(){
   SCREEN='map'; hideAll(); gaugeOff();
+  setBgmScene('morning');
   updateForestMascot();
   standGrp.visible=false; stumpGrp.visible=false; pivot.visible=false;
   targetGrp.visible=false; predLine.visible=false; axe.visible=false;
@@ -345,6 +346,7 @@ function travel(i){
 }
 function toForest(){
   SCREEN='forest'; hideAll();
+  setBgmScene('forest');
   standGrp.visible=true; stumpGrp.visible=true; pivot.visible=false;
   targetGrp.visible=false; predLine.visible=false; axe.visible=false;
   $('treecard').classList.remove('hide');
@@ -744,6 +746,7 @@ const EVE=[
 ];
 function toEvening(){
   SCREEN='evening'; hideAll(); gaugeOff();
+  setBgmScene('evening');
   standGrp.visible=false;stumpGrp.visible=false;pivot.visible=false;
   targetGrp.visible=false;predLine.visible=false;axe.visible=false;
   want.r=40; want.ty=9;
@@ -924,6 +927,7 @@ function finishShrineStage(){
     }});
 }
 function showFestivalEnding(){
+  setBgmScene('festival');
   if(!WORLD.ending.completed){
     WORLD.ending={completed:true,day:WORLD.day,viewed:true};
     WORLD.unlocks.kishu=true;
@@ -936,10 +940,11 @@ function showFestivalEnding(){
     button:'一緒に山へ行こう',art:dogArt('kishu','mascot')});
   showStory({label:'これから',title:'山での暮らしは続く',
     body:`本殿を完成させ、祭りを取り戻した。\n${WORLD.day}日目。\n\n紀州犬が山へついてくるようになった。\n手入れ度100の林では、苗が神木へ育つことがある。`,
-    button:'山へ戻る'});
+    button:'山へ戻る',onConfirm:()=>setBgmScene('night')});
 }
 function toNight(){
   SCREEN='night'; hideAll(); NIGHT_TAB='tools'; nightMessage('');
+  setBgmScene('night');
   $('record-choice').classList.add('hide');
   $('record-choice').querySelectorAll('[data-manual-slot]').forEach(b=>b.textContent=recordText(b.dataset.manualSlot));
   $('nightov').classList.remove('hide'); drawNight(); topbar();soundNight();
