@@ -87,14 +87,17 @@ function advanceDrying(){
 }
 Object.assign(WORLD,{
   axe:'old',ownedAxes:['old'],
-  inv:{bento:0,feed:0,stone:0,wedge:0,salve:0,sapling:0},
+  inv:{bento:0,feed:0,stone:0,wedge:0,salve:0,sapling:0,sake:0},
   auto:{bento:true,feed:true},lumber:[],
   buildings:{shed:false,doghouse:false,hearth:false,workshop:false,doma:false},
   dogs:{},                // {shiba:{bond:0}, …}
   dogCare:null,           // 今夜一緒に遊んだ1頭
   travelPaidToday:[],     // 今日すでに移動体力を払った林
   mascot:null,            // 昼に映す犬
-  storyFlags:{shrineResolve:false},
+  storyFlags:{shrineResolve:false,careLesson:false,sakeMigrated:false},
+  kamidana:{level:0},
+  shrine:{started:false,stage:0,submitted:[[],[],[],[],[]],paid:[false,false,false,false,false]},
+  ending:{completed:false,day:null,viewed:false},
   unlocks:{doghouse:false,workshop:false,miyama:false,snow:false,master:false},
   morning:{carry:0,bento:0},
   stands:{},pendingCut:null
@@ -138,11 +141,27 @@ function normalizeWorld(){
   WORLD.today={fells:0,esses:0,keptKamiDay:false,essForests:[],...(WORLD.today||{})};
   if(!Array.isArray(WORLD.today.essForests))WORLD.today.essForests=[];
   /* 山守のお香は廃止して苗に置き換えた（ROADMAP §11.5） */
-  WORLD.inv={bento:0,feed:0,stone:0,wedge:0,salve:0,sapling:0,...(WORLD.inv||{})};
+  WORLD.inv={bento:0,feed:0,stone:0,wedge:0,salve:0,sapling:0,sake:0,...(WORLD.inv||{})};
   delete WORLD.inv.incense; delete WORLD.auto?.incense; delete WORLD.incenseRun;
   WORLD.buildings={shed:false,doghouse:false,hearth:false,workshop:false,doma:false,
     ...(WORLD.buildings||{})};
-  WORLD.storyFlags={shrineResolve:false,...(WORLD.storyFlags||{})};
+  WORLD.storyFlags={shrineResolve:false,careLesson:false,sakeMigrated:false,...(WORLD.storyFlags||{})};
+  WORLD.kamidana={level:0,...(WORLD.kamidana||{})};
+  /* お神酒実装前に神主1・2・4を達成した記録にも、未使用分を一度だけ補う。 */
+  if(!WORLD.storyFlags.sakeMigrated){
+    const earned=['kannushi-1','kannushi-2','kannushi-4']
+      .filter(id=>(WORLD.requestsDone||[]).includes(id)).length;
+    WORLD.inv.sake=Math.max(WORLD.inv.sake||0,Math.max(0,earned-(WORLD.kamidana.level||0)));
+    WORLD.storyFlags.sakeMigrated=true;
+  }
+  const shrine=WORLD.shrine||{};
+  WORLD.shrine={
+    started:!!shrine.started,
+    stage:clamp(Number(shrine.stage)||0,0,5),
+    submitted:Array.from({length:5},(_,i)=>Array.isArray(shrine.submitted?.[i])?shrine.submitted[i]:[]),
+    paid:Array.from({length:5},(_,i)=>!!shrine.paid?.[i])
+  };
+  WORLD.ending={completed:false,day:null,viewed:false,...(WORLD.ending||{})};
   /* 旧セーブの WORLD.dog（'shiba' か true）を3頭形式へ移す */
   if(typeof WORLD.dogs!=='object'||WORLD.dogs===null)WORLD.dogs={};
   if(WORLD.dog&&!WORLD.dogs.shiba)WORLD.dogs.shiba={bond:0};
@@ -212,6 +231,14 @@ function dailyGrowth(){
     f.avgD=Math.min(0.62,f.avgD+0.002*(1+f.care/100));
     f.care=Math.max(0,f.care-1);
   }
+}
+/* 神棚は全林の自然な荒れを緩める。通常は毎朝 care -1。
+   一段目は2日に一度+1、二段目は毎日+1、三段目は毎日+2。 */
+function applyKamidanaCare(){
+  const level=WORLD.kamidana?.level||0;
+  const add=level>=3?2:level>=2?1:level===1&&WORLD.day%2===0?1:0;
+  if(add)for(const f of FORESTS)f.care=Math.min(100,f.care+add);
+  return {level,add,net:add-1};
 }
 function effCare(f){return f.care*(0.5+0.5*(f.stock/f.maxStock))}
 function gradeRange(f){

@@ -11,7 +11,7 @@
      神主        … 年若く、静か。一番短く、**問いで終わる**                        */
 
 /* 未実装の仕組み。false の間、それに依存する依頼は出さない（§12.1 の require の一種） */
-const SYSTEMS={dry:true,craft:true,sake:false,shrine:false};
+const SYSTEMS={dry:true,craft:true,sake:true,shrine:true};
 
 const CLIENTS={
   builder:{key:'builder',name:'大工の棟梁',
@@ -34,7 +34,9 @@ const CLIENTS={
    all-S-day  … その日伐った木がすべてSの日を N度（minFells 本以上伐った日のみ）
    care       … forest の手入れ度が level 以上
    care-multi … forests すべてが level 以上
-   roadworks  … 道の手入れを通算 N回                                        */
+   roadworks  … 道の手入れを通算 N回
+   kamidana   … 小さな神棚を建て、お神酒を奉納する
+   shrine     … 社を五段階すべて完成させる                                  */
 const REQUESTS=[
   /* ── 大工の棟梁（すが・若い女） ── 短い命令形。数を言う */
   {id:'builder-1',client:'builder',title:'檜の一等を三本',
@@ -121,8 +123,8 @@ const REQUESTS=[
 
   /* ── 山の持ち主（若い当主・ぼっちゃん） ── 丁寧で世間知らず。金を出さないと明言する */
   {id:'owner-1',client:'owner',title:'雑木林に手を入れる',
-   text:'あの雑木林、手入れ度を六十まで上げてほしい。\nお金は出さない。……ぼく、お金の使い方をよく知らないんだ。',
-   doneText:'……見ていたよ。砥石ならうちの蔵にある。安く回すよ。',
+   text:'あの雑木林、手入れ度を六十まで上げてほしい。\n手入れ度が高いほど、一等や特等の木が出やすくなって、売値も上がる。ただ、手を入れなければ毎朝ひとつずつ下がる。\nお金は出さない。……ぼく、お金の使い方をよく知らないんだ。',
+   doneText:'……見ていたよ。これで一等や特等の木が出やすくなって、売値も上がる。砥石ならうちの蔵にある。安く回すよ。',
    give:{kind:'care',forest:0,level:60},days:null,pay:0,unlocks:['cheap-stone']},
 
   {id:'owner-2',client:'owner',title:'道をならす',
@@ -153,20 +155,20 @@ const REQUESTS=[
    doneText:'休ませましたね。山は見ています。',
    give:{kind:'kamiday',need:1},days:null,pay:0,unlocks:['sake']},
 
-  {id:'kannushi-3',client:'kannushi',title:'大木に供える',
-   text:'直径五十を超える木に、お神酒を供えてから伐ってごらんなさい。',
-   doneText:'大きな木には、大きな礼を。',
-   give:{kind:'offering',minD:0.50,need:1},days:null,pay:0,unlocks:['sake'],
-   needs:'sake',require:{forests:[3]}},
+  {id:'kannushi-3',client:'kannushi',title:'山を祀る場所',
+   text:'人の手が入らない林は、夜明けごとに手入れがひとつ落ちます。\n家に小さな神棚を設け、お神酒を供えてみませんか。',
+   doneText:'山を思う場所ができましたね。\n神棚をさらに整える方法を、お教えしましょう。',
+   give:{kind:'kamidana',need:1},days:null,pay:0,unlocks:['kamidana-2'],
+   needs:'sake'},
 
   {id:'kannushi-4',client:'kannushi',title:'一日、山に礼を尽くす',
    text:'一日、山に礼を尽くす。\n苗を植えるくらい最高判定で。二本以上。\nその日に伐る木を、すべてS評価にできますか。',
-   doneText:'そういう日が、山を変えるのです。\n……紀州の犬を貸しましょう。神の使いです。',
-   give:{kind:'all-S-day',minFells:2,need:1},days:null,pay:0,unlocks:['sake','kishu']},
+   doneText:'そういう日が、山を変えるのです。',
+   give:{kind:'all-S-day',minFells:2,need:1},days:null,pay:0,unlocks:['sake']},
 
   {id:'kannushi-5',client:'kannushi',title:'社の材を納める',
    text:'社の材を。段階ごとに、お持ちください。',
-   doneText:'……宮大工を呼びましょう。本殿は、あの人でなければ。',
+   doneText:'……社が戻りました。祭りの支度を始めましょう。',
    give:{kind:'shrine'},days:null,pay:0,unlocks:['miyadaiku'],needs:'shrine'}
 ];
 
@@ -223,6 +225,10 @@ function reqProgress(req){
     return {now:Math.round(low),max:g.level}}
   if(g.kind==='roadworks'){
     return {now:FORESTS.reduce((a,f)=>a+f.roadWorks,0),max:g.need}}
+  if(g.kind==='kamidana')
+    return {now:(WORLD.kamidana?.level||0)>=1?1:0,max:1};
+  if(g.kind==='shrine')
+    return {now:WORLD.shrine?.stage||0,max:5};
   return {now:req.progress,max:g.need||1};
 }
 const reqDone=req=>{const p=reqProgress(req);return p.now>=p.max};
@@ -277,6 +283,7 @@ function acceptRequest(id){
     accepted:WORLD.day,deadline:days?WORLD.day+days:null,
     progress:d.give.kind==='deliver'?d.give.parts.map(()=>0):0,
     submitted:[]});
+  if(id==='kannushi-5')WORLD.shrine.started=true;
   if(!WORLD.metClients.includes(d.client))WORLD.metClients.push(d.client);
   return true;
 }
@@ -311,6 +318,10 @@ function expireRequests(){
 const WORKSHOP_KEYS=['workshop-1','workshop-2'];
 function applyUnlock(key){
   WORLD.unlocks[key]=true;
+  if(key==='sake'){
+    WORLD.inv.sake=(WORLD.inv.sake||0)+1;
+    WORLD.unlocks.sake=true;
+  }
   if(key==='miyama')WORLD.unlocks.miyama=true;
   if(key==='snow')WORLD.unlocks.snow=true;
   if(key==='master')WORLD.unlocks.master=true;
@@ -333,7 +344,6 @@ function noteFell(info){
     const g=reqDef(r.id).give;
     if(g.kind==='safe-fell'&&!info.accident)r.progress++;
     if(g.kind==='thin'&&info.D<g.maxD)r.progress++;
-    if(g.kind==='offering'&&info.offered&&info.D>=g.minD)r.progress++;
     if(reqDone(r))completeRequest(r);
   }
 }

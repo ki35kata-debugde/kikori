@@ -225,8 +225,13 @@ function toMap(){
   const planted=(WORLD.morning.planted||[])
     .map(p=>`${FORESTS[p.forest]?.name} に苗 ${p.n}本`).join('　');
   const seed=planted?`<br><g>${planted}</g>　残り本数と上限が増えた。`:'';
+  const shrineCare=WORLD.morning.shrineCare;
+  const careLine=shrineCare?.level
+    ?`<br><g>山の手入れ</g>　自然な荒れ −1　神棚の守り ＋${shrineCare.add}${
+      shrineCare.net>0?'　全ての林が1ずつ整った':shrineCare.net===0?'　今日は保たれた':'　今日は守りのない日'}`
+    :'';
   $('map-sub').innerHTML=WORLD.moves===0
-    ?`体力 100 ＋${WORLD.morning.carry} 繰り越し ＋${WORLD.morning.bento} 弁当 ＝ <b class="mn">${Math.round(WORLD.stamina)}</b><br>${req}${seed}`
+    ?`体力 100 ＋${WORLD.morning.carry} 繰り越し ＋${WORLD.morning.bento} 弁当 ＝ <b class="mn">${Math.round(WORLD.stamina)}</b><br>${req}${seed}${careLine}`
     :`いまの体力 <b class="mn">${Math.round(WORLD.stamina)}</b>　—　移動するたびに体力を使う。`;
   drawMap(); previewForest(mapChoice); drawRecordSlots(); topbar();
   $('mapov').classList.remove('hide');
@@ -286,8 +291,8 @@ function drawMap(){
     const mix=Object.entries(f.mix).filter(([,v])=>v>0)
       .map(([k,v])=>`${SPECIES[k].name} ${Math.round(v/mixTotal*100)}%`).join('　');
     return `<div class="fcard ${st.c==='ng'?'poor':''} ${mapChoice===i?'chosen':''}" data-go="${i}">
-      <h2 class="forest-title"><span>${f.name}</span>${kaiForecast(f)}</h2>
-      <div style="margin:9px 0 12px"><button class="key" data-travel="${i}" ${ok?'':'disabled'}>ここにいく！</button></div>
+      <h2 class="forest-title"><span>${f.name}</span></h2>
+      <div class="forest-go-row">${kaiForecast(f)}<button class="key" data-travel="${i}" ${ok?'':'disabled'}>ここにいく！</button></div>
       <div class="mix">${mix}</div>
       <div class="fr"><span>手入れ度</span>
         <span class="meter"><i style="width:${f.care}%;background:${f.care>=70?'#7fa85c':f.care>=40?'#d4a94e':'#c04a32'}"></i></span>
@@ -562,8 +567,8 @@ function showResult(){
   const cap=lumberCapacity();
   /* 採点を木に残す。納品条件（採点B以上）と倉庫の記録に使う */
   T.rank=rank;
-  /* 行い型の依頼（事故なく／間伐／お神酒）と、その日の会心数を数える */
-  noteFell({rank,accident:S.barber||S.over,D:T.D,offered:!!T.offered});
+  /* 行い型の依頼（事故なく／間伐）と、その日の会心数を数える */
+  noteFell({rank,accident:S.barber||S.over,D:T.D});
   let settled=false;
   const finish=(mode,next,reqId)=>{
     if(settled)return;
@@ -795,6 +800,144 @@ function buildLumberPlan(cost){
 function spendBuildLumber(plan){
   [...plan].sort((a,b)=>b.index-a.index).forEach(x=>WORLD.lumber.splice(x.index,1));
 }
+/* ══════════ 神棚・社の再建 ══════════ */
+const KAMIDANA_STAGES=[
+  {name:'小さな神棚',money:120000,parts:[{species:'hinoki',need:1}],
+   effect:'全ての林の手入れを、二日に一度＋1'},
+  {name:'神棚を整える',money:300000,parts:[{species:'hinoki',processed:1,need:2}],
+   effect:'全ての林の手入れを、毎朝＋1'},
+  {name:'山の祭具一式',money:600000,parts:[{species:'hinoki',processed:1,dried:true,need:3}],
+   effect:'全ての林の手入れを、毎朝＋2'}
+];
+const SHRINE_STAGES=[
+  {name:'鳥居',money:30000,parts:[{species:'sugi',grade:'一等',need:3}]},
+  {name:'手水舎',money:70000,parts:[{species:'hinoki',grade:'一等',dried:true,processed:1,need:2}]},
+  {name:'堂',money:100000,parts:[
+    {species:'hinoki',grade:'一等',dried:true,need:3},
+    {species:'sugi',processed:1,need:3}]},
+  {name:'拝殿',money:200000,parts:[
+    {species:'hinoki',grade:'一等',need:4},
+    {species:'sugi',processed:1,need:5}]},
+  {name:'本殿',money:350000,parts:[
+    {species:'hinoki',bornGrade:'特等',need:5},
+    {species:'hinoki',bornGrade:'一等',dried:true,grade:'特等',need:5}]}
+];
+const partLabel=p=>{
+  const bits=[SPECIES[p.species]?.name||p.species];
+  if(p.bornGrade==='特等')bits.push('伐った時から特等');
+  else if(p.bornGrade==='一等'&&p.dried)bits.push('一等を寝かせて特等');
+  else if(p.grade)bits.push(`${p.grade}以上`);
+  if(p.dried&&p.bornGrade!=='一等')bits.push('寝かせ');
+  if(p.processed)bits.push('板');
+  return bits.join('・');
+};
+function shrinePartMatches(p,log){
+  if(!partMatches(p,log))return false;
+  if(p.bornGrade&&log.bornGrade!==p.bornGrade)return false;
+  return true;
+}
+function materialPlan(parts){
+  const used=new Set(),out=[];
+  for(const p of parts){
+    const candidates=WORLD.lumber.map((log,index)=>({log,index}))
+      .filter(x=>!x.log.held&&!used.has(x.index)&&shrinePartMatches(p,x.log))
+      .sort((a,b)=>logSaleValue(a.log)-logSaleValue(b.log)||a.index-b.index);
+    if(candidates.length<p.need)return null;
+    for(const x of candidates.slice(0,p.need)){used.add(x.index);out.push(x)}
+  }
+  return out;
+}
+const currentShrineDef=()=>SHRINE_STAGES[WORLD.shrine?.stage||0]||null;
+const shrineSubmitted=stage=>WORLD.shrine?.submitted?.[stage]||[];
+const shrinePartCount=(stage,partIndex)=>{
+  const def=SHRINE_STAGES[stage],part=def?.parts?.[partIndex];
+  return part?shrineSubmitted(stage).filter(x=>shrinePartMatches(part,x)).length:0;
+};
+function shrineLogEligible(log){
+  const stage=WORLD.shrine?.stage||0,def=SHRINE_STAGES[stage];
+  if(!WORLD.shrine?.started||!def)return false;
+  return def.parts.some((p,i)=>shrinePartCount(stage,i)<p.need&&shrinePartMatches(p,log));
+}
+function submitShrineLog(index){
+  const log=WORLD.lumber[index],stage=WORLD.shrine.stage,def=SHRINE_STAGES[stage];
+  if(!log||!def||!shrineLogEligible(log))return;
+  showStory({label:`社の再建　${def.name}`,title:'この材を建材として納めますか？',
+    body:`${log.name}・${log.grade}\n売価 ${yen(logSaleValue(log))}円\n\n納めた材は倉庫へ戻せません。`,
+    button:'建材として納める',cancel:'戻る',onConfirm:()=>{
+      const live=WORLD.lumber[index];
+      if(!live||!shrineLogEligible(live))return;
+      WORLD.shrine.submitted[stage].push(live);
+      WORLD.lumber.splice(index,1);
+      soundSuccess();nightMessage(`${def.name}の建材を納めた。景色に色が戻った。`);
+      drawNight();topbar();
+    }});
+}
+function buildKamidana(level){
+  const def=KAMIDANA_STAGES[level-1];
+  if(!def||level!==(WORLD.kamidana.level+1)||WORLD.inv.sake<1||WORLD.money<def.money)return;
+  if(level===2&&!WORLD.unlocks['kamidana-2'])return;
+  if(level===3&&!WORLD.ending.completed)return;
+  const plan=materialPlan(def.parts);if(!plan)return;
+  const lines=plan.map(x=>`・${x.log.name}・${x.log.grade}`).join('\n');
+  showStory({label:'山を祀る',title:def.name,
+    body:`${lines}\n\n奉納　お神酒 1本\n費用　${yen(def.money)}円\n\n${def.effect}\n現在、何もしなければ全ての林の手入れは毎朝1ずつ下がります。`,
+    button:'建てて奉納する',cancel:'戻る',onConfirm:()=>{
+      const live=materialPlan(def.parts);
+      if(!live||WORLD.money<def.money||WORLD.inv.sake<1)return;
+      WORLD.money-=def.money;WORLD.inv.sake--;spendBuildLumber(live);
+      WORLD.kamidana.level=level;WORLD.unlocks.kamidana=true;
+      soundSuccess();nightMessage(`${def.name}が整った。${def.effect}。`);
+      const k3=(WORLD.requests||[]).find(r=>r.id==='kannushi-3');
+      if(k3&&reqDone(k3))completeRequest(k3);
+      drawNight();topbar();
+      showStory({label:'神棚',title:'山全体への守り',
+        body:level===1
+          ?'人の手が入らない林は、夜明けごとに手入れがひとつ落ちます。\n\n小さな神棚の守りで、その衰えは半分になります。'
+          :`${def.effect}。\n毎朝の自然な荒れ −1 と合わせて、山全体の変化が決まります。`,
+        button:'山を見守る'});
+    }});
+}
+function shrineStageReady(stage=WORLD.shrine.stage){
+  const def=SHRINE_STAGES[stage];if(!def)return false;
+  return def.parts.every((p,i)=>shrinePartCount(stage,i)>=p.need);
+}
+function finishShrineStage(){
+  const stage=WORLD.shrine.stage,def=SHRINE_STAGES[stage];
+  if(!def||!shrineStageReady(stage)||WORLD.money<def.money)return;
+  showStory({label:'社の再建',title:`${def.name}を完成させますか？`,
+    body:`建材はすべて納まりました。\n職人への謝礼　${yen(def.money)}円`,
+    button:'完成させる',cancel:'戻る',onConfirm:()=>{
+      if(!shrineStageReady(stage)||WORLD.money<def.money||WORLD.shrine.stage!==stage)return;
+      WORLD.money-=def.money;WORLD.shrine.paid[stage]=true;WORLD.shrine.stage++;
+      if(stage===3)applyUnlock('miyadaiku');
+      soundSuccess();nightMessage(`${def.name}が完成した。`);
+      const active=(WORLD.requests||[]).find(r=>r.id==='kannushi-5');
+      if(active&&reqDone(active))completeRequest(active);
+      drawNight();topbar();
+      showStory({label:`社の再建　${stage+1}/5`,title:`${def.name}が完成した`,
+        body:stage===2?'堂に、あの日の村人の名を刻んだ。収入も解禁もない。それでも必要な場所だった。'
+          :stage===3?'拝殿が立った。神主が宮大工へ使いを出した。本殿まで、あと一つ。'
+          :stage===4?'最後の檜が、宮大工の手で納まった。新しい本殿の屋根に夕日の色が残っている。'
+          :'納めた材が柱となり、境内に形が戻った。',
+        button:stage===4?'祭りの支度をする':'次の材を確かめる',
+        onConfirm:stage===4?()=>setTimeout(showFestivalEnding,0):null});
+    }});
+}
+function showFestivalEnding(){
+  if(!WORLD.ending.completed){
+    WORLD.ending={completed:true,day:WORLD.day,viewed:true};
+    WORLD.unlocks.kishu=true;
+  }
+  showStory({label:'本殿完成',title:'祭りの灯',
+    body:'鳥居に注連縄が張られた。\n手水舎に水が戻り、拝殿の前に提灯が並んだ。\n\n笛が鳴る。\n途絶えていた祭りが、もう一度始まった。',
+    button:'境内を見る',art:'assets/shrine-complete.png'});
+  showStory({label:'祭りの夜',title:'白い犬',
+    body:'祭りの笛が鳴り始めたころ、一頭の白い犬が鳥居をくぐってきた。\n\n神主が、しばらく言葉を失った。\n\n「……前の神主が、神様の使いとして山へ連れていた紀州犬です」\n\n犬は境内をひと回りすると、こちらの前で座った。',
+    button:'一緒に山へ行こう',art:dogArt('kishu','mascot')});
+  showStory({label:'これから',title:'山での暮らしは続く',
+    body:`本殿を完成させ、祭りを取り戻した。\n${WORLD.day}日目。\n\n紀州犬が山へついてくるようになった。\n手入れ度100の林では、苗が神木へ育つことがある。`,
+    button:'山へ戻る'});
+}
 function toNight(){
   SCREEN='night'; hideAll(); NIGHT_TAB='tools'; nightMessage('');
   $('record-choice').classList.add('hide');
@@ -859,13 +1002,16 @@ const TAB_ICONS={
   lumber:'<path d="M3 6l7-3 7 3-7 3-7-3zm0 0v7l7 4 7-4V6M10 9v8"/>',
   dogs:'<path d="M6 9c-3-1-3-5-1-6l3 3h4l3-3c2 1 2 5-1 6v5c-2 3-6 3-8 0V9zM8 11h.1M12 11h.1M9 14h2"/>',
   build:'<path d="M3 9l7-6 7 6v8H3V9zm5 8v-5h4v5"/>',
-  requests:'<path d="M5 3h10v14H5V3zm2 4h6M7 10h6M7 13h4"/>'
+  requests:'<path d="M5 3h10v14H5V3zm2 4h6M7 10h6M7 13h4"/>',
+  shrine:'<path d="M3 8h14M5 8v8m10-8v8M2 16h16M4 6l6-3 6 3"/>'
 };
 const iconSvg=k=>`<span class="tabico"><svg viewBox="0 0 20 20" aria-hidden="true">${TAB_ICONS[k]||''}</svg></span>`;
 function drawNight(){
   updateNightDog();   /* 犬を迎える／土間を建てる／表示を切り替えるたびに追従させる */
   $('night-money').textContent=yen(WORLD.money)+'円';
-  const tabs=[['tools','道具'],['goods','消耗品'],['dogs','犬'],['build','建てる'],['requests','依頼'],['lumber','材木倉庫']];
+  const tabs=[['tools','道具'],['goods','消耗品'],['dogs','犬'],['build','建てる'],['requests','依頼'],
+    ...(WORLD.shrine?.started||WORLD.shrine?.stage>0||WORLD.ending?.completed?[['shrine','社の再建']]:[]),
+    ['lumber','材木倉庫']];
   $('nighttabs').innerHTML=tabs.map(([k,n])=>{
     const isNew=k==='requests'&&newRequestWaiting();
     return `<button data-tab="${k}" class="${NIGHT_TAB===k?'sel':''}${isNew?' fresh':''}"`+
@@ -875,7 +1021,7 @@ function drawNight(){
     NIGHT_TAB=b.dataset.tab;drawNight();
     if(NIGHT_TAB==='requests')showPendingRequestResults();
   });
-  $('night-stock').textContent=`木材 ${WORLD.lumber.length}/${lumberCapacity()}（杉 ${lumberCount('sugi')}・檜 ${lumberCount('hinoki')}・楢 ${lumberCount('nara')}）　信用・棟梁 ${WORLD.credit.builder}`;
+  $('night-stock').textContent=`木材 ${WORLD.lumber.length}/${lumberCapacity()}（杉 ${lumberCount('sugi')}・檜 ${lumberCount('hinoki')}・楢 ${lumberCount('nara')}）　お神酒 ${WORLD.inv.sake||0}本`;
   const body=$('nightbody');
   if(NIGHT_TAB==='tools'){
     body.innerHTML=Object.values(AXES).map(a=>{
@@ -930,7 +1076,8 @@ function drawNight(){
         <td>${log.name}</td><td>${log.grade}</td>
         <td><b class="mid">${yen(logSaleValue(log))}円</b></td>
         <td><button data-sell-log="${i}">売る</button></td>
-        <td>${match?`<button data-deliver-log="${i}">納品</button>`:'－'}</td>
+        <td>${match?`<button data-deliver-log="${i}">依頼</button>`:''}${
+          shrineLogEligible(log)?`<button data-shrine-log="${i}">建材</button>`:match?'':'－'}</td>
         <td>${stage}</td><td>${dry}</td>
       </tr>`;
     }).join('');
@@ -953,6 +1100,7 @@ function drawNight(){
       log.held=!log.held;saveGame('auto');drawNight();
     });
     body.querySelectorAll('[data-deliver-log]').forEach(b=>b.onclick=()=>deliverStoredLog(+b.dataset.deliverLog));
+    body.querySelectorAll('[data-shrine-log]').forEach(b=>b.onclick=()=>submitShrineLog(+b.dataset.shrineLog));
     body.querySelectorAll('[data-sell-log]').forEach(b=>b.onclick=()=>sellStoredLog(+b.dataset.sellLog));
   }else if(NIGHT_TAB==='dogs'){
     let html='';
@@ -991,14 +1139,13 @@ function drawNight(){
       ${WORLD.buildings.doma?`<div class="row"><span>土間に入れている</span><b class="ok">放っておいても ${BOND_DOMA_CAP} まで上がる</b></div>`
         :'<div class="row"><span>土間に入れると、放っておいてもなつく</span><b class="mid">「建てる」から</b></div>'}
       </div>`;
-    const hondenDone=!!(WORLD.unlocks.honden||WORLD.buildings.honden);
-    const kishuReady=!!(WORLD.unlocks.kishu&&hondenDone);
+    const kishuReady=!!WORLD.unlocks.kishu;
     html+=`<div class="shopcard"><h3>紀州犬</h3>
-      <p>神の使い。飼うのではなく、神主から借りる。<br>
-      <b class="mid">本殿完成後</b>に借りられる。連れて入った林の手入れ度が100なら、
+      <p>前の神主が神様の使いとして山へ連れていた白い犬。飼う犬ではない。<br>
+      <b class="mid">本殿完成後の祭り</b>で出会う。連れて入った林の手入れ度が100なら、
       植えた苗が<b>神木</b>になる。</p>
       <div class="row"><b class="${kishuReady?'ok':'mid'}">${
-        kishuReady?'借りられる':WORLD.unlocks.kishu?'本殿の完成を待つ':'神主の信用が要る'}</b></div></div>`;
+        kishuReady?'山へついてくる':'祭りが戻るのを待つ'}</b></div></div>`;
     body.innerHTML=html;
     body.querySelectorAll('[data-adopt]').forEach(b=>b.onclick=()=>adoptDog(b.dataset.adopt));
     body.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>{
@@ -1021,13 +1168,55 @@ function drawNight(){
       ['hearth','囲炉裏を直す',25000,{nara:2},'楢で炉端を直す。早帰りの上限 20 → 28',true],
       ['workshop','工房',120000,{sugi:6,hinoki:4,nara:3},'加工を解禁',WORLD.unlocks.workshop]
     ];
-    body.innerHTML=`<div class="shopcard"><h3>建築に使う材</h3>
+    let buildHtml=`<div class="shopcard"><h3>建築に使う材</h3>
       <p>売価が安いものから使用します。使いたくない材は、先に<b class="mid">「材木倉庫」タブで「保持：🔒」</b>にしてください。保持した木材は建築の対象外です。</p></div>`+
       builds.map(([k,n,m,c,e,open])=>{
       const built=WORLD.buildings[k],woodOK=!!buildLumberPlan(c);
       const cost=Object.entries(c).map(([s,v])=>`${SPECIES[s].name}×${v}`).join('、');
       return `<div class="shopcard"><h3>${n}</h3><p>${e}。必要：${cost}</p><div class="row"><b>${yen(m)}円</b><button data-build="${k}" ${built||!open||WORLD.money<m||!woodOK?'disabled':''}>${built?'完成':open?'建てる':'依頼で解禁'}</button></div></div>`}).join('');
+    if(WORLD.unlocks.sake||WORLD.kamidana.level){
+      const next=WORLD.kamidana.level+1,def=KAMIDANA_STAGES[next-1];
+      if(def){
+        const open=next===1||next===2&&WORLD.unlocks['kamidana-2']||next===3&&WORLD.ending.completed;
+        const mat=def.parts.map(p=>`${partLabel(p)}×${p.need}`).join('、');
+        const ok=!!materialPlan(def.parts)&&WORLD.money>=def.money&&WORLD.inv.sake>=1&&open;
+        buildHtml+=`<div class="shopcard kamidana-card"><h3>${def.name}</h3>
+          <p><b class="mid">通常、すべての林は毎朝 手入れ−1。</b><br>${def.effect}。<br>
+          必要：${mat}、お神酒×1</p><div class="row"><b>${yen(def.money)}円</b>
+          <button data-kamidana="${next}" ${ok?'':'disabled'}>${open?'建てて奉納する':next===3?'本殿完成後':'神主の依頼で解禁'}</button></div></div>`;
+      }else buildHtml+=`<div class="shopcard kamidana-card"><h3>山の祭具一式</h3>
+        <p>全ての林へ毎朝＋2。自然な荒れ−1と合わせ、手入れが毎朝1ずつ増える。</p>
+        <div class="row"><b class="ok">完成</b></div></div>`;
+    }
+    body.innerHTML=buildHtml;
     body.querySelectorAll('[data-build]').forEach(b=>b.onclick=()=>buildStructure(b.dataset.build));
+    body.querySelectorAll('[data-kamidana]').forEach(b=>b.onclick=()=>buildKamidana(+b.dataset.kamidana));
+  }else if(NIGHT_TAB==='shrine'){
+    const stage=WORLD.shrine.stage,def=SHRINE_STAGES[stage];
+    const submitted=SHRINE_STAGES.reduce((n,_,i)=>n+shrineSubmitted(i).length,0);
+    const reveal=Math.min(100,submitted/30*100);
+    if(!def){
+      body.innerHTML=`<div class="shrine-panel">
+        <div class="shrine-picture" style="--reveal:100%"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
+          <div class="shrine-color"><img src="assets/shrine-complete.png" alt="完成した社"></div></div>
+        <h2>本殿完成</h2><p>祭りを取り戻した。山での暮らしは、これからも続く。</p>
+        <button data-ending>祭りの夜を思い出す</button></div>`;
+      body.querySelector('[data-ending]').onclick=showFestivalEnding;
+    }else{
+      const parts=def.parts.map((p,i)=>{
+        const now=shrinePartCount(stage,i);
+        return `<div class="tr"><span>${partLabel(p)}</span><b class="${now>=p.need?'ok':'mid'}">${now} / ${p.need}本</b></div>`;
+      }).join('');
+      body.innerHTML=`<div class="shrine-panel">
+        <div class="shrine-picture" style="--reveal:${reveal}%"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
+          <div class="shrine-color"><img src="assets/shrine-complete.png" alt="材を納めるほど色が戻る社"></div></div>
+        <div class="shrine-copy"><span class="lb">社の再建　${stage+1} / 5</span><h2>${def.name}</h2>
+          <p>材を納めるたび、景色に色が戻る。建材は「材木倉庫」から一本ずつ納める。</p>
+          ${parts}<div class="row"><span>職人への謝礼</span><b>${yen(def.money)}円</b></div>
+          <button data-finish-shrine ${shrineStageReady(stage)&&WORLD.money>=def.money?'':'disabled'}>${shrineStageReady(stage)?'謝礼を渡して完成させる':'建材を納める'}</button>
+        </div></div>`;
+      body.querySelector('[data-finish-shrine]').onclick=finishShrineStage;
+    }
   }else{
     /* 受注中 → 頼まれている → 済んだこと の3区分（ROADMAP §12.1） */
     let html='';
@@ -1076,7 +1265,8 @@ const UNLOCK_LABEL={miyama:'深山へ入れる',doghouse:'犬小屋',snow:'雪�
   master:'名工の斧',akita:'秋田犬',kai:'甲斐犬',kishu:'紀州犬',sapling:'苗',
   sake:'お神酒',furniture:'家具の作り方','cheap-stone':'砥石が半額',
   miyadaiku:'宮大工','client:dealer':'材木屋と会える','client:sakichi':'佐吉と会える',
-  'workshop-1':'工房の話が進む','workshop-2':'工房の話が進む'};
+  'workshop-1':'工房の話が進む','workshop-2':'工房の話が進む',
+  'kamidana-2':'神棚をさらに整えられる'};
 const unlockText=ks=>'開くもの：'+ks.map(k=>UNLOCK_LABEL[k]||k).join('、');
 
 /* 夜の進捗パネル（ROADMAP §12.10）— 記録ボタンの直上に5人固定で並べる */
@@ -1301,10 +1491,11 @@ function nextDay(manualSlot=null){
   let lunch=0;
   if(WORLD.auto.bento&&WORLD.inv.bento>0){WORLD.inv.bento--;lunch=8}
   const bonds=advanceBonds();   /* 餌と世話でなつき度が動く */
-  WORLD.morning={carry,bento:lunch,planted};
+  WORLD.morning={carry,bento:lunch,planted,shrineCare:null};
   WORLD.stamina=100+carry+lunch; WORLD.carry=0;
   WORLD.moves=0; WORLD.at=-1;
   dailyGrowth();
+  WORLD.morning.shrineCare=applyKamidanaCare();
   prepareDailyStands();
   const showResolve=WORLD.day===2&&!WORLD.storyFlags.shrineResolve;
   if(showResolve)WORLD.storyFlags.shrineResolve=true;
