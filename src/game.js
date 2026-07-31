@@ -250,8 +250,6 @@ function previewForest(i){
   if(!FORESTS[i])return;
   $('map-bg').src=FOREST_ART(i);
   $('map-bg').className=`forest-scene tone-${i}`;
-  const old=document.querySelector('.kai-forecast');if(old)old.remove();
-  const h=$('map-h');if(h)h.insertAdjacentHTML('beforeend',kaiForecast(FORESTS[i]));
 }
 function drawMap(){
   $('mapcards').innerHTML=FORESTS.map((f,i)=>{
@@ -288,7 +286,7 @@ function drawMap(){
     const mix=Object.entries(f.mix).filter(([,v])=>v>0)
       .map(([k,v])=>`${SPECIES[k].name} ${Math.round(v/mixTotal*100)}%`).join('　');
     return `<div class="fcard ${st.c==='ng'?'poor':''} ${mapChoice===i?'chosen':''}" data-go="${i}">
-      <h2>${f.name}</h2>
+      <h2 class="forest-title"><span>${f.name}</span>${kaiForecast(f)}</h2>
       <div style="margin:9px 0 12px"><button class="key" data-travel="${i}" ${ok?'':'disabled'}>ここにいく！</button></div>
       <div class="mix">${mix}</div>
       <div class="fr"><span>手入れ度</span>
