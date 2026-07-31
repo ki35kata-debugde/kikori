@@ -157,7 +157,8 @@ function normalizeWorld(){
     if(log.dried==null)log.dried=false;
     if(log.processed==null)log.processed=0;
     if(log.furniture==null)log.furniture=null;
-    if(log.held==null)log.held=false;
+    /* 旧版や不正な文字列値も含め、true のときだけ保持扱いにする。 */
+    log.held=log.held===true;
   }
   /* v2 の単体 request を新形式へ移す */
   if(WORLD.request){
@@ -172,6 +173,13 @@ function normalizeWorld(){
         submitted:r.submitted||[]});
     if(!WORLD.metClients.includes('builder'))WORLD.metClients.push('builder');
     delete WORLD.request;
+  }
+  /* 新しい最低期限より短い受注中依頼は、旧セーブでも自動的に延長する。 */
+  if(typeof reqDef==='function'&&typeof requestMinimumDays==='function'){
+    for(const r of WORLD.requests){
+      const days=requestMinimumDays(reqDef(r.id));
+      if(days&&r.accepted!=null)r.deadline=Math.max(r.deadline??0,r.accepted+days);
+    }
   }
 }
 const FORESTS=[

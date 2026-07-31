@@ -381,11 +381,19 @@
   .lumber-summary{margin-bottom:9px;color:var(--kihada);font-family:'Shippori Mincho',serif;
     font-size:14px;letter-spacing:.08em}
   .lumber-table-wrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:3px}
-  .lumber-table{min-width:760px;background:rgba(8,11,9,.58)}
+  .lumber-table{min-width:700px;table-layout:fixed;background:rgba(8,11,9,.58)}
   .lumber-table th,.lumber-table td{text-align:left;vertical-align:middle}
-  .lumber-table th:nth-child(6),.lumber-table td:nth-child(6){text-align:right}
+  .lumber-table th:nth-child(1),.lumber-table td:nth-child(1){width:48px;text-align:center}
+  .lumber-table th:nth-child(2),.lumber-table td:nth-child(2){width:72px}
+  .lumber-table th:nth-child(3),.lumber-table td:nth-child(3){width:52px}
+  .lumber-table th:nth-child(4),.lumber-table td:nth-child(4){width:88px;text-align:right}
+  .lumber-table th:nth-child(5),.lumber-table td:nth-child(5){width:58px;text-align:center}
+  .lumber-table th:nth-child(6),.lumber-table td:nth-child(6){width:66px;text-align:center}
+  .lumber-table th:nth-child(7),.lumber-table td:nth-child(7){width:72px}
+  .lumber-table th:nth-child(8),.lumber-table td:nth-child(8){width:88px}
   .lumber-table tr{cursor:default}
   .lumber-table button{padding:7px 9px;font-size:10px}
+  .lumber-table .hold-lock{min-width:32px;padding:6px;font-size:16px;line-height:1}
 
   /* 夜の進捗パネル — 記録ボタンの直上に5人固定（ROADMAP §12.10） */
   #reqboard{position:relative;z-index:3;width:min(560px,94vw);margin:18px auto 0;
@@ -699,7 +707,8 @@
     <h1 id="story-title"></h1>
     <p id="story-body"></p>
     <div style="margin-top:22px"><button id="story-ok" class="key">わかった</button>
-      <button id="story-cancel" class="hide">戻る</button></div>
+      <button id="story-cancel" class="hide">戻る</button>
+      <button id="story-third" class="hide">断る</button></div>
   </div>
 </div>
 
@@ -748,8 +757,8 @@ const yen=n=>n.toLocaleString();
 /* ══════════ 樹種・品等 ══════════ */
 </script>
 <script src="src/species.js?v=20260731-2"></script>
-<script src="src/world.js?v=20260731-15"></script>
-<script src="src/requests.js?v=20260731-11"></script>
+<script src="src/world.js?v=20260731-16"></script>
+<script src="src/requests.js?v=20260731-16"></script>
 <script src="src/physics.js?v=20260731-2"></script>
 <script src="src/scoring.js?v=20260731-2"></script>
 <script src="src/ui/dial.js?v=20260731-2"></script>
@@ -758,7 +767,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-2"></script>
 <script src="src/tutorial.js?v=20260731-2"></script>
-<script src="src/game.js?v=20260731-15"></script>
+<script src="src/game.js?v=20260731-16"></script>
 <script src="src/scene3d.js?v=20260731-2"></script>
 <script>
 (() => {

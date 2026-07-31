@@ -184,9 +184,10 @@ function hideAll(){
   ringSel.visible=false; ringHov.visible=false;
 }
 const STORY_QUEUE=[];
-function showStory({label='',title='',body='',button='わかった',cancel=null,art=null,onConfirm=null}){
+function showStory({label='',title='',body='',button='わかった',cancel=null,third=null,
+  art=null,onConfirm=null,onCancel=null,onThird=null}){
   if(!$('storyov').classList.contains('hide')){
-    STORY_QUEUE.push({label,title,body,button,cancel,art,onConfirm});return;
+    STORY_QUEUE.push({label,title,body,button,cancel,third,art,onConfirm,onCancel,onThird});return;
   }
   $('story-label').textContent=label;
   $('story-title').textContent=title;
@@ -194,16 +195,21 @@ function showStory({label='',title='',body='',button='わかった',cancel=null,
   $('story-ok').textContent=button;
   $('story-cancel').textContent=cancel||'';
   $('story-cancel').classList.toggle('hide',!cancel);
+  $('story-third').textContent=third||'';
+  $('story-third').classList.toggle('hide',!third);
   const img=$('story-art');
   if(art){img.src=art;img.classList.remove('hide')}else{img.src='';img.classList.add('hide')}
   $('storyov').classList.remove('hide');
-  const closeStory=run=>{
+  const closeStory=action=>{
     $('storyov').classList.add('hide');
-    if(run&&onConfirm)onConfirm();
+    if(action==='confirm'&&onConfirm)onConfirm();
+    if(action==='cancel'&&onCancel)onCancel();
+    if(action==='third'&&onThird)onThird();
     const next=STORY_QUEUE.shift();if(next)showStory(next);
   };
-  $('story-ok').onclick=()=>closeStory(true);
-  $('story-cancel').onclick=()=>closeStory(false);
+  $('story-ok').onclick=()=>closeStory('confirm');
+  $('story-cancel').onclick=()=>closeStory('cancel');
+  $('story-third').onclick=()=>closeStory('third');
 }
 function toMap(){
   SCREEN='map'; hideAll(); gaugeOff();
@@ -915,22 +921,18 @@ function drawNight(){
     });
     const rows=sorted.map(({log,i})=>{
       const match=requestMatches(log);
-      /* 乾燥は「あと何日 → 何になる」で書く。割合では何をすべきか伝わらない（SPEC §12.4） */
       const left=dryLeft(log);
       const stage=log.furniture?log.furniture:(log.processed||0)>=1?'板':'丸太';
-      const dry=log.furniture
-        ?`<b class="ok">完成品</b>　${log.furniture}`
-        :log.dried
-        ?`<b class="ok">乾いた</b>　${(log.processed||0)>=1
-          ?WORLD.unlocks.furniture?'家具・道具にできる':'佐吉に板を見せる'
-          :'板に挽ける'}`
-        :`乾燥 <b class="mid">あと ${left}日</b>　→　${nextGrade(log.grade)}`;
+      const dry=log.dried||log.furniture?'<b class="ok">乾燥済み</b>':`あと ${left}日`;
       return `<tr>
-        <td><button data-hold-log="${i}" class="${log.held?'sel':''}">保持：${log.held?'🔒':'🔓'}</button></td>
-        <td>${match?'★ ':''}${log.name}</td><td>${log.grade}</td><td>${stage}</td>
-        <td>${dry}</td><td><b class="mid">${yen(logSaleValue(log))}円</b></td>
-        <td><button data-sell-log="${i}">売る</button>${
-          match?` <button data-deliver-log="${i}">依頼へ納める</button>`:''}</td>
+        <td><button data-hold-log="${i}" class="hold-lock ${log.held?'sel':''}"
+          title="${log.held?'保持を外す':'この材を保持する'}" aria-label="${log.held?'保持中':'保持していない'}">${
+            log.held?'🔒':'🔓'}</button></td>
+        <td>${log.name}</td><td>${log.grade}</td>
+        <td><b class="mid">${yen(logSaleValue(log))}円</b></td>
+        <td><button data-sell-log="${i}">売る</button></td>
+        <td>${match?`<button data-deliver-log="${i}">納品</button>`:'－'}</td>
+        <td>${stage}</td><td>${dry}</td>
       </tr>`;
     }).join('');
     const arrow=k=>lumberSortKey===k?(lumberSortDir>0?' ▲':' ▼'):'';
@@ -938,9 +940,9 @@ function drawNight(){
       <div class="lumber-summary">杉 ${lumberCount('sugi')}本　檜 ${lumberCount('hinoki')}本　楢 ${lumberCount('nara')}本</div>
       <div class="lumber-table-wrap"><table class="lumber-table">
         <thead><tr><th>保持</th><th data-lumber-sort="species">種類${arrow('species')}</th>
-          <th>品等</th><th>状態</th><th>乾燥</th>
-          <th data-lumber-sort="price">売価${arrow('price')}</th><th>操作</th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="7">木材はまだない</td></tr>'}</tbody>
+          <th>品等</th><th data-lumber-sort="price">売価${arrow('price')}</th>
+          <th>売却</th><th>依頼</th><th>状態</th><th>乾燥まで</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="8">木材はまだない</td></tr>'}</tbody>
       </table></div></div>`;
     body.querySelectorAll('[data-lumber-sort]').forEach(h=>h.onclick=()=>{
       const k=h.dataset.lumberSort;
@@ -1043,7 +1045,7 @@ function drawNight(){
       html+=`<div class="shopcard"><h3 class="mid">${clientAvatar(k)}${clientName(k)}</h3>
         <p>${d.text.replace(/\n/g,'<br>')}</p>
         <div class="stockline" style="text-align:left">
-          ${d.days?`期限 ${d.days}日`:'期限なし'}
+          ${requestMinimumDays(d)?`期限 ${requestMinimumDays(d)}日`:'期限なし'}
           ${d.pay?`／ 報酬 ${yen(d.pay)}円`:'／ 報酬なし'}
           ${d.unlocks?.length?`<br>${unlockText(d.unlocks)}`:''}</div>
         <div class="row"><b class="mid">頼まれている</b>
@@ -1251,6 +1253,36 @@ function buildStructure(k){
         button:'工房を使ってみる'});
     }});
 }
+function closeExpiredRequest(r,penalty){
+  if(!(WORLD.requests||[]).includes(r))return;
+  WORLD.lumber.push(...(r.submitted||[]));
+  if(penalty)WORLD.credit[r.client]=(WORLD.credit[r.client]||0)-1;
+  if(!WORLD.requestsFailed.includes(r.id))WORLD.requestsFailed.push(r.id);
+  WORLD.requests=WORLD.requests.filter(x=>x!==r);
+  WORLD.requestLog.unshift({id:r.id,day:WORLD.day,ok:false,
+    returned:(r.submitted||[]).length,apologized:!penalty});
+  saveGame('auto');drawNight();topbar();
+}
+function showExpiredRequestChoices(expired){
+  for(const r of expired||[]){
+    const d=reqDef(r.id);if(!d)continue;
+    showStory({label:`${clientName(r.client)}への依頼`,title:`「${d.title}」の期限を過ぎた`,
+      body:'期限に間に合いませんでした。どう伝えますか？\n\n「謝って伸ばす」なら、信用を落とさず7日延長してもらえます。',
+      button:'謝って伸ばす',cancel:'謝って断る',third:'断る',
+      onConfirm:()=>{
+        r.deadline=WORLD.day+7;
+        saveGame('auto');nightMessage('謝って、期限を7日延ばしてもらった。信用は変わらない。');drawNight();
+      },
+      onCancel:()=>{
+        closeExpiredRequest(r,false);
+        nightMessage('謝って依頼を断った。信用は変わらない。');
+      },
+      onThird:()=>{
+        closeExpiredRequest(r,true);
+        nightMessage('依頼を断った。信用が1下がった。',true);
+      }});
+  }
+}
 function nextDay(manualSlot=null){
   /* 神主の依頼後は、日付を問わず一日山へ入らなければ達成。 */
   if(WORLD.today.fells===0&&(WORLD.forestsToday||[]).length===0)
@@ -1258,7 +1290,7 @@ function nextDay(manualSlot=null){
   noteDayEnd();                 /* 一日の会心・山の神の日を依頼へ反映 */
   const planted=[];              /* 苗はS評価の結果画面で任意に植える */
   WORLD.day++;
-  expireRequests();             /* 期限切れ → 材を返して信用 −1 */
+  const expired=expireRequests(); /* 期限切れは自動失敗にせず、朝に3択で決める */
   advanceDrying();              /* 倉庫の材を1日ぶん乾かす */
   WORLD.today={fells:0,esses:0,keptKamiDay:false,essForests:[]};
   WORLD.forestsToday=[];
@@ -1285,6 +1317,7 @@ function nextDay(manualSlot=null){
     showStory({label:'絆が深まった',title:`${d.name}が、もっと頼れる相棒になった`,
       body:d.s2.replace(/<[^>]+>/g,''),button:'これからも頼む',art:dogArt(k,'mascot')});
   }
+  showExpiredRequestChoices(expired);
 }
 $('night-next').onclick=()=>nextDay();
 $('night-record-next').onclick=()=>$('record-choice').classList.toggle('hide');

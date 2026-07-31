@@ -15,7 +15,7 @@ const SYSTEMS={dry:true,craft:true,sake:false,shrine:false};
 
 const CLIENTS={
   builder:{key:'builder',name:'大工の棟梁',
-    intro:`帰ってきてくれたんだね。\nあなたのお父さんがいなくなってから、山のことまで手が回らなかった。\n\nお父さんの代わりになってくれて助かる。\nまず、檜の一等を三本お願いできる？　七日あれば大丈夫。`},
+    intro:`帰ってきてくれたんだね。\nあなたのお父さんがいなくなってから、山のことまで手が回らなかった。\n\nお父さんの代わりになってくれて助かる。\nまず、檜の一等を三本お願いできる？　十五日あれば大丈夫。`},
   dealer:{key:'dealer',name:'材木屋',
     intro:`噂は聞いています。棟梁が若いのを使っていると。\n\nわたしは材を買うだけ。目利きはしません。\n値のつくものを、まとまった数で。\n……太いものは、太いだけで値がつきます。そこは覚えておいて。`},
   sakichi:{key:'sakichi',name:'家具屋の佐吉',
@@ -38,11 +38,11 @@ const CLIENTS={
 const REQUESTS=[
   /* ── 大工の棟梁（すが・若い女） ── 短い命令形。数を言う */
   {id:'builder-1',client:'builder',title:'檜の一等を三本',
-   text:'まず、檜の一等以上を三本お願いできる？\n七日あれば大丈夫。無理はしないで。',
+   text:'まず、檜の一等以上を三本お願いできる？\n十五日あれば大丈夫。無理はしないで。',
    doneText:'助かった。丁寧に伐ってくれたんだね。\n深山へ入る話と、犬小屋のことも通しておいたよ。',
    failText:'間に合わなかったね。でも、山で無理をしないほうが大事。',
    give:{kind:'deliver',parts:[{species:'hinoki',grade:'一等',need:3}]},
-   days:7,pay:60000,unlocks:['miyama','doghouse','client:dealer']},
+   days:15,pay:60000,unlocks:['miyama','doghouse','client:dealer']},
 
   {id:'builder-2',client:'builder',title:'梁にする杉を二本',
    text:'梁にする。直径四十を超える杉を二本。六日。\n細いのは要らない。',
@@ -59,12 +59,12 @@ const REQUESTS=[
    days:8,pay:80000,unlocks:['workshop-1']},
 
   {id:'builder-4',client:'builder',title:'杉と檜、二本ずつ',
-   text:'杉の一等を二本、檜の一等を二本。十日。',
+   text:'杉の一等を二本、檜の一等を二本。二十日。',
    doneText:'助かった。……父が見たら、なんて言うかな。',
    failText:'四本は四本。数えてから受けて。',
    give:{kind:'deliver',parts:[
      {species:'sugi',grade:'一等',need:2},{species:'hinoki',grade:'一等',need:2}]},
-   days:10,pay:100000,require:{buildings:['shed']}},
+   days:20,pay:100000,require:{buildings:['shed']}},
 
   /* ── 材木屋のおかみ（中年の女） ── 敬語だが冷たい。値を言う */
   {id:'dealer-1',client:'dealer',title:'楢を一本',
@@ -89,11 +89,11 @@ const REQUESTS=[
    days:12,pay:110000,unlocks:['kai'],require:{forests:[3]}},
 
   {id:'dealer-4',client:'dealer',title:'寝かせた檜を三本',
-   text:'檜の一等を、十日寝かせてから。三本。\n乾いた材は値が変わります。ご存じでしょう。',
+   text:'檜の一等を、十日寝かせてから。三本。二十五日で。\n乾いた材は値が変わります。ご存じでしょう。',
    doneText:'これが乾き材の値です。覚えておいてください。',
    failText:'乾かすには日数が要ります。受けてから伐っては間に合いません。',
    give:{kind:'deliver',parts:[{species:'hinoki',grade:'一等',dried:true,need:3}]},
-   days:14,pay:130000,needs:'dry',require:{buildings:['shed']}},
+   days:25,pay:130000,needs:'dry',require:{buildings:['shed']}},
 
   /* ── 家具屋の佐吉 ── 木そのものを見る */
   {id:'sakichi-1',client:'sakichi',title:'まず見せてくれ',
@@ -172,6 +172,16 @@ const REQUESTS=[
 
 const reqDef=id=>REQUESTS.find(r=>r.id===id);
 const clientName=k=>CLIENTS[k]?.name||k;
+/* 一等指定は1本5日。乾燥指定は、その依頼で最長の乾燥日数を一度加える。
+   元の期限がこれより長い場合は短くしない。 */
+function requestMinimumDays(d){
+  if(!d||d.give?.kind!=='deliver')return d?.days||0;
+  const parts=d.give.parts||[];
+  const firstGrade=parts.reduce((n,p)=>n+(p.grade==='一等'?(p.need||0):0),0);
+  const dryExtra=Math.max(0,...parts.filter(p=>p.dried)
+    .map(p=>DRY_DAYS[p.species]||0));
+  return Math.max(d.days||0,firstGrade*5+dryExtra);
+}
 /* 夜の依頼カードに添える小さなシルエット。無ければ何も出さない */
 const clientAvatar=k=>`<img class="client-avatar" src="assets/client-${k}.png" alt=""
   onerror="this.remove()">`;
@@ -262,8 +272,9 @@ const canAcceptMore=()=>(WORLD.requests||[]).length<3;
 /* ── 受ける・納める ── */
 function acceptRequest(id){
   const d=reqDef(id); if(!d||!canAcceptMore())return false;
+  const days=requestMinimumDays(d);
   WORLD.requests.push({id,client:d.client,
-    accepted:WORLD.day,deadline:d.days?WORLD.day+d.days:null,
+    accepted:WORLD.day,deadline:days?WORLD.day+days:null,
     progress:d.give.kind==='deliver'?d.give.parts.map(()=>0):0,
     submitted:[]});
   if(!WORLD.metClients.includes(d.client))WORLD.metClients.push(d.client);
@@ -292,15 +303,7 @@ function completeRequest(r){
   WORLD.pendingRequestResults.push({id:r.id,day:WORLD.day});
 }
 function expireRequests(){
-  for(const r of [...(WORLD.requests||[])]){
-    if(r.deadline==null||WORLD.day<=r.deadline)continue;
-    const d=reqDef(r.id);
-    WORLD.lumber.push(...(r.submitted||[]));      // 納めた材は返す
-    WORLD.credit[r.client]=(WORLD.credit[r.client]||0)-1;
-    WORLD.requestsFailed.push(r.id);
-    WORLD.requests=WORLD.requests.filter(x=>x!==r);
-    WORLD.requestLog.unshift({id:r.id,day:WORLD.day,ok:false,returned:(r.submitted||[]).length});
-  }
+  return [...(WORLD.requests||[])].filter(r=>r.deadline!=null&&WORLD.day>r.deadline);
 }
 
 /* ── 解禁 ──
