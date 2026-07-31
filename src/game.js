@@ -698,13 +698,14 @@ function updateNightDog(){
   el.onerror=()=>el.classList.add('hide');
   el.alt=`土間で休む${DOGS[k].name}`;
   el.classList.remove('hide');
-  /* 起きている間は床を歩く。待機3回＋喜ぶ1回を2〜3セット見せてから、
-     その場で寝姿に切り替え、以後は横移動させない。 */
-  el.classList.remove('framed');
+  /* 柴犬だけ、起きている間は床を歩く。待機3回＋大喜び1回を2〜3セット後、
+     その場で寝る。ほかの犬は最初から移動せず寝る。 */
   const sleep=()=>{
     if(token!==nightDogRunToken||mascotDog()!==k||!WORLD.buildings.doma)return;
-    if(!DOG_HAS_SLEEP[k]){el.src=dogArt(k,'mascot');return}
     el.classList.add('framed');
+    el.style.animation='none';
+    el.style.transform='scaleX(-1)';
+    if(!DOG_HAS_SLEEP[k]){el.src=dogArt(k,'mascot');return}
     let f=0;
     const sleepFrame=()=>{
       if(token!==nightDogRunToken||mascotDog()!==k||!WORLD.buildings.doma)return;
@@ -713,12 +714,11 @@ function updateNightDog(){
     };
     sleepFrame();
   };
-  if(!DOG_HAS_FRAMES[k]){
-    el.src=dogArt(k,'mascot');
-    nightDogTimer=setTimeout(sleep,12500);
-    return;
-  }
-  const repeats=2+((WORLD.day+['shiba','akita','kai','kishu'].indexOf(k))%2);
+  if(k!=='shiba'){sleep();return}
+  el.classList.remove('framed');
+  el.style.animation='';
+  el.style.transform='';
+  const repeats=2+(WORLD.day%2);
   const states=Array.from({length:repeats},()=>['idle','idle','idle','joy']).flat();
   let stateAt=0;
   const awakeState=()=>{
@@ -854,9 +854,9 @@ function drawNight(){
     const builds=[
       ['shed','物置',60000,{sugi:4},'保管枠 5 → 20',true],
       ['doghouse','犬小屋',30000,{sugi:3},'犬を飼える',WORLD.unlocks.doghouse],
-      ['doma','土間を直す',30000,{sugi:2},'犬を家に入れられる。放っておいてもなつき度が'+BOND_DOMA_CAP+'まで上がる',WORLD.buildings.doghouse],
-      ['hearth','囲炉裏を直す',25000,{sugi:2},'早帰りの上限 20 → 28',true],
-      ['workshop','工房',120000,{hinoki:6,sugi:10},'加工を解禁',WORLD.unlocks.workshop]
+      ['doma','土間を直す',30000,{nara:2},'楢で上がり框を直す。犬を家に入れられ、放っておいてもなつき度が'+BOND_DOMA_CAP+'まで上がる',WORLD.buildings.doghouse],
+      ['hearth','囲炉裏を直す',25000,{nara:2},'楢で炉端を直す。早帰りの上限 20 → 28',true],
+      ['workshop','工房',120000,{sugi:6,hinoki:4,nara:3},'加工を解禁',WORLD.unlocks.workshop]
     ];
     body.innerHTML=builds.map(([k,n,m,c,e,open])=>{
       const built=WORLD.buildings[k],woodOK=Object.entries(c).every(([s,v])=>lumberCount(s)>=v);
@@ -1056,8 +1056,8 @@ function mascotReact(kind){
 function buildStructure(k){
   const cfg={
     shed:[60000,{sugi:4}],doghouse:[30000,{sugi:3}],
-    doma:[30000,{sugi:2}],
-    hearth:[25000,{sugi:2}],workshop:[120000,{hinoki:6,sugi:10}]
+    doma:[30000,{nara:2}],
+    hearth:[25000,{nara:2}],workshop:[120000,{sugi:6,hinoki:4,nara:3}]
   }[k];
   if(!cfg)return;
   WORLD.money-=cfg[0];spendLumber(cfg[1]);WORLD.buildings[k]=true;
@@ -1149,6 +1149,8 @@ function loadGame(slot='auto'){
     if(!hadStands)saveGame(slot);
     WORLD.at=-1;WORLD.moves=0;
     toMap();
+    showStory({label:'記録',title:'読み込みました',
+      body:`${WORLD.day}日目の朝から再開します。`,button:'つづける'});
   }catch(e){alert('セーブデータを読み込めませんでした。')}
 }
 function migrateLegacySave(){

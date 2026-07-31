@@ -67,12 +67,12 @@ const REQUESTS=[
    days:10,pay:100000,require:{buildings:['shed']}},
 
   /* ── 材木屋のおかみ（中年の女） ── 敬語だが冷たい。値を言う */
-  {id:'dealer-1',client:'dealer',title:'杉を四本',
-   text:'杉を四本。品等は問いません。\n数がまとまれば、それだけで値になります。',
+  {id:'dealer-1',client:'dealer',title:'楢を一本',
+   text:'楢を一本。品等は問いません。\n床材を探している方がいます。硬い木ですから、細くても値になります。',
    doneText:'結構です。……棟梁が工房の話をしていましたね。わたしからも口を利きます。',
-   failText:'期日は期日です。次は数を見てからお受けください。',
-   give:{kind:'deliver',parts:[{species:'sugi',need:4}]},
-   days:10,pay:60000,unlocks:['workshop-2']},
+   failText:'期日は期日です。次は材を確かめてからお受けください。',
+   give:{kind:'deliver',parts:[{species:'nara',need:1}]},
+   days:10,pay:45000,unlocks:['workshop-2']},
 
   {id:'dealer-2',client:'dealer',title:'楢の一等を二本',
    text:'楢の一等以上を二本。\n……家具屋が欲しがっています。会わせましょうか。',
