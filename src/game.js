@@ -184,21 +184,26 @@ function hideAll(){
   ringSel.visible=false; ringHov.visible=false;
 }
 const STORY_QUEUE=[];
-function showStory({label='',title='',body='',button='わかった',art=null}){
+function showStory({label='',title='',body='',button='わかった',cancel=null,art=null,onConfirm=null}){
   if(!$('storyov').classList.contains('hide')){
-    STORY_QUEUE.push({label,title,body,button,art});return;
+    STORY_QUEUE.push({label,title,body,button,cancel,art,onConfirm});return;
   }
   $('story-label').textContent=label;
   $('story-title').textContent=title;
   $('story-body').textContent=body;
   $('story-ok').textContent=button;
+  $('story-cancel').textContent=cancel||'';
+  $('story-cancel').classList.toggle('hide',!cancel);
   const img=$('story-art');
   if(art){img.src=art;img.classList.remove('hide')}else{img.src='';img.classList.add('hide')}
   $('storyov').classList.remove('hide');
-  $('story-ok').onclick=()=>{
+  const closeStory=run=>{
     $('storyov').classList.add('hide');
+    if(run&&onConfirm)onConfirm();
     const next=STORY_QUEUE.shift();if(next)showStory(next);
   };
+  $('story-ok').onclick=()=>closeStory(true);
+  $('story-cancel').onclick=()=>closeStory(false);
 }
 function toMap(){
   SCREEN='map'; hideAll(); gaugeOff();
@@ -358,10 +363,13 @@ function resumeCut(){
 }
 function postponeCut(){
   if(SCREEN!=='play'||!S||S.phase>=3)return;
-  if(!confirm('夕方になります。よろしいですか？'))return;
-  WORLD.pendingCut={forestId:WORLD.at,treeIndex:sel,state:JSON.parse(JSON.stringify(S))};
-  gaugeOff();say('切り口を養生した。明日、同じ木の続きを切れる。');
-  setTimeout(toEvening,450);
+  showStory({label:'伐採を中断する',title:'明日に続けますか？',
+    body:'切り口を養生して、今日は夕方へ進みます。\n明日は同じ木の続きから再開できます。',
+    button:'明日に続ける',cancel:'切り続ける',onConfirm:()=>{
+      WORLD.pendingCut={forestId:WORLD.at,treeIndex:sel,state:JSON.parse(JSON.stringify(S))};
+      gaugeOff();say('切り口を養生した。明日、同じ木の続きを切れる。');
+      setTimeout(toEvening,250);
+    }});
 }
 function goto(ph){
   S.phase=ph; gaugeOff();
@@ -689,6 +697,13 @@ function toNight(){
 }
 /* 土間を直すと、犬が家の中（囲炉裏のそば）で眠る。 */
 let nightDogTimer=null,nightDogRunToken=0;
+/* 寝姿の元画像は透明キャンバス内の位置がコマごとに違う。
+   犬本体の中心と足元を揃える表示補正（px）。 */
+const DOG_SLEEP_OFFSETS={
+  shiba:[[-5,0],[5,0],[-4,21],[5,20]],
+  akita:[[-4,0],[4,0],[-4,27],[4,27]],
+  kai:[[-3,0],[2,0],[-3,17],[4,16]]
+};
 function updateNightDog(){
   const el=$('night-dog'); if(!el)return;
   const k=mascotDog();
@@ -716,6 +731,8 @@ function updateNightDog(){
     let f=0;
     const sleepFrame=()=>{
       if(token!==nightDogRunToken||mascotDog()!==k||!WORLD.buildings.doma)return;
+      const [dx,dy]=(DOG_SLEEP_OFFSETS[k]||[])[f]||[0,0];
+      el.style.transform=`translate(${dx}px,${dy}px) scaleX(-1)`;
       el.src=dogFrame(k,'sleep',f);f=(f+1)%DOG_ANIMS.sleep.frames;
       nightDogTimer=setTimeout(sleepFrame,DOG_ANIMS.sleep.ms);
     };
@@ -1072,8 +1089,8 @@ function buildStructure(k){
   nightMessage('自分で伐った木で建てた。新しい棚が開いた。');drawNight();topbar();
 }
 function nextDay(manualSlot=null){
-  /* 山の神の日に山へ入らなかったか。日付を進める前に判定する */
-  if(kamiDay()&&WORLD.today.fells===0&&(WORLD.forestsToday||[]).length===0)
+  /* 神主の依頼後は、日付を問わず一日山へ入らなければ達成。 */
+  if(WORLD.today.fells===0&&(WORLD.forestsToday||[]).length===0)
     WORLD.today.keptKamiDay=true;
   noteDayEnd();                 /* 一日の会心・山の神の日を依頼へ反映 */
   const planted=plantSaplings(); /* Sを取った本数だけ苗が植わる（枠は使わない） */

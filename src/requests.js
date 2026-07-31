@@ -15,7 +15,7 @@ const SYSTEMS={dry:true,craft:false,sake:false,shrine:false};
 
 const CLIENTS={
   builder:{key:'builder',name:'大工の棟梁',
-    intro:`大工の棟梁は、去年からわたし。\n父が死んだから。……その顔、みんなする。\n\n檜の一等を三本。七日でいい。\n出せる？　出せないなら、そう言って。`},
+    intro:`帰ってきてくれたんだね。\nあなたのお父さんがいなくなってから、山のことまで手が回らなかった。\n\nお父さんの代わりになってくれて助かる。\nまず、檜の一等を三本お願いできる？　七日あれば大丈夫。`},
   dealer:{key:'dealer',name:'材木屋',
     intro:`噂は聞いています。棟梁が若いのを使っていると。\n\nわたしは材を買うだけ。目利きはしません。\n値のつくものを、まとまった数で。\n……太いものは、太いだけで値がつきます。そこは覚えておいて。`},
   sakichi:{key:'sakichi',name:'家具屋の佐吉',
@@ -38,9 +38,9 @@ const CLIENTS={
 const REQUESTS=[
   /* ── 大工の棟梁（すが・若い女） ── 短い命令形。数を言う */
   {id:'builder-1',client:'builder',title:'檜の一等を三本',
-   text:'檜の一等以上を三本。七日でいい。\n出せる？　出せないなら、そう言って。',
-   doneText:'いい木。深山へ入る話は通しておいた。犬小屋のことも。',
-   failText:'……間に合わなかったね。数を見てから受けて。',
+   text:'まず、檜の一等以上を三本お願いできる？\n七日あれば大丈夫。無理はしないで。',
+   doneText:'助かった。丁寧に伐ってくれたんだね。\n深山へ入る話と、犬小屋のことも通しておいたよ。',
+   failText:'間に合わなかったね。でも、山で無理をしないほうが大事。',
    give:{kind:'deliver',parts:[{species:'hinoki',grade:'一等',need:3}]},
    days:7,pay:60000,unlocks:['miyama','doghouse','client:dealer']},
 
@@ -148,9 +148,9 @@ const REQUESTS=[
    doneText:'結構です。……苗を植えることを、お教えしましょう。',
    give:{kind:'safe-fell',need:5},days:null,pay:0,unlocks:['sapling','sake']},
 
-  {id:'kannushi-2',client:'kannushi',title:'山の神の日',
-   text:'十二日ごとに、山の神の日が来ます。\n一度、山へ入らずに過ごせますか。',
-   doneText:'守りましたね。山は見ています。',
+  {id:'kannushi-2',client:'kannushi',title:'一日、山を休ませる',
+   text:'一度、山を休ませてごらんなさい。\nどこかで一日、山へ入らずに過ごせますか。\n（依頼を受けたあと、一日山へ入らなければ達成）',
+   doneText:'休ませましたね。山は見ています。',
    give:{kind:'kamiday',need:1},days:null,pay:0,unlocks:['sake']},
 
   {id:'kannushi-3',client:'kannushi',title:'大木に供える',
