@@ -841,7 +841,7 @@ const SHRINE_PART_LAYOUT=[
   {src:'assets/shrine-parts/01-torii.png',  left:11.72,top:64.45,width:18.23,height:32.03},
   {src:'assets/shrine-parts/02-chozuya.png',left:46.88,top:66.41,width:14.32,height:23.44},
   {src:'assets/shrine-parts/03-do.png',     left:16.93,top:39.06,width:19.53,height:22.66},
-  {src:'assets/shrine-parts/04-haiden.png', left:45.57,top:38.09,width:24.74,height:23.63},
+  {src:'assets/shrine-parts/04-haiden.png', left:45.57,top:38.09,width:24.74,height:25.59},
   {src:'assets/shrine-parts/05-honden.png', left:63.80,top:14.65,width:23.44,height:32.52}
 ];
 /* その建物だけの色づき具合（%）。終えた段階は100、まだ来ていない段階は0、
