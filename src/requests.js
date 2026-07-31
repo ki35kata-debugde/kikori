@@ -111,13 +111,13 @@ const REQUESTS=[
    days:18,pay:240000,unlocks:['furniture'],needs:'craft',require:{buildings:['workshop']}},
 
   {id:'sakichi-3',client:'sakichi',title:'座卓を一つ',
-   text:'座卓を一つ。乾かした楢で。\nあとは檜のまな板、二枚。……急ぐな。',
+   text:'座卓を一つ。乾かした楢で。\nそれと、檜のまな板を二枚。乾くまで待つのも仕事だ。二十五日で持ってこい。',
    doneText:'……上手いもんだ。山のぼっちゃんに、あんたの名を言っておく。',
    failText:'乾かして、挽いて、削る。日が足りなかったな。',
    give:{kind:'deliver',parts:[
      {species:'nara',furniture:'座卓',dried:true,need:1},
      {species:'hinoki',furniture:'まな板',need:2}]},
-   days:20,pay:320000,needs:'craft',require:{buildings:['workshop']}},
+   days:25,pay:320000,needs:'craft',require:{buildings:['workshop']}},
 
   /* ── 山の持ち主（若い当主・ぼっちゃん） ── 丁寧で世間知らず。金を出さないと明言する */
   {id:'owner-1',client:'owner',title:'雑木林に手を入れる',
@@ -160,7 +160,7 @@ const REQUESTS=[
    needs:'sake',require:{forests:[3]}},
 
   {id:'kannushi-4',client:'kannushi',title:'一日、山に礼を尽くす',
-   text:'一日、山に礼を尽くす。\nその日伐る木を、すべて会心で。二本以上。\n……伐った数と同じだけ、苗が植わるはずです。',
+   text:'一日、山に礼を尽くす。\n苗を植えるくらい最高判定で。二本以上。\nその日に伐る木を、すべてS評価にできますか。',
    doneText:'そういう日が、山を変えるのです。\n……紀州の犬を貸しましょう。神の使いです。',
    give:{kind:'all-S-day',minFells:2,need:1},days:null,pay:0,unlocks:['sake','kishu']},
 
@@ -343,7 +343,7 @@ function noteDayEnd(){
   for(const r of [...(WORLD.requests||[])]){
     const g=reqDef(r.id).give;
     if(g.kind==='all-S-day'&&t.fells>=g.minFells&&t.esses===t.fells)r.progress++;
-    if(g.kind==='kamiday'&&t.keptKamiDay)r.progress++;
+    if(g.kind==='kamiday'&&(WORLD.forestsToday||[]).length===0)r.progress++;
     if(reqDone(r))completeRequest(r);
   }
   /* 手入れ度と道は世界の状態から導くので、達成の取りこぼしをここで拾う */

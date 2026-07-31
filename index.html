@@ -185,7 +185,15 @@
   .fcard.lock.ready{opacity:1;border-color:var(--kihada);background:rgba(212,169,78,.08)}
   .fcard.poor{border-color:rgba(192,74,50,.35)}
   .fcard h2{font-family:'Shippori Mincho',serif;font-weight:800;font-size:22px;letter-spacing:.1em}
-  .fcard .mix{font-size:10px;color:var(--nezumi);letter-spacing:.16em;margin:2px 0 12px}
+  .fcard .mix{font-size:10px;color:var(--washi);letter-spacing:.16em;margin:2px 0 12px}
+  #map-h{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+  .kai-forecast{display:inline-grid;grid-template-columns:58px;justify-items:center;gap:1px;
+    vertical-align:middle}
+  .kai-forecast img{width:58px;height:58px;object-fit:contain;border-radius:50%;
+    background:rgba(233,227,213,.88);border:1px solid rgba(212,169,78,.75);
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.35))}
+  .kai-forecast b{font-size:9px;line-height:1.2;white-space:nowrap;color:var(--kihada);
+    letter-spacing:.02em}
   .fr{display:flex;justify-content:space-between;align-items:center;
     padding:6px 0;border-top:1px solid var(--line);font-size:11px}
   .fr span{color:var(--nezumi)} .fr b{font-family:'Shippori Mincho',serif;font-size:14px}
@@ -393,7 +401,15 @@
   .lumber-table th:nth-child(8),.lumber-table td:nth-child(8){width:88px}
   .lumber-table tr{cursor:default}
   .lumber-table button{padding:7px 9px;font-size:10px}
-  .lumber-table .hold-lock{min-width:32px;padding:6px;font-size:16px;line-height:1}
+  .lumber-table th:nth-child(-n+3),.lumber-table td:nth-child(-n+3){
+    position:sticky;z-index:2;background:#151a16}
+  .lumber-table th:nth-child(-n+3){z-index:4;background:#1a201b}
+  .lumber-table th:nth-child(1),.lumber-table td:nth-child(1){left:0}
+  .lumber-table th:nth-child(2),.lumber-table td:nth-child(2){left:48px}
+  .lumber-table th:nth-child(3),.lumber-table td:nth-child(3){left:120px;
+    box-shadow:5px 0 8px rgba(0,0,0,.28)}
+  .lumber-table .hold-star{min-width:30px;padding:5px;font-size:19px;line-height:1}
+  .lumber-table .hold-star.sel{color:var(--kihada);border-color:var(--kihada)}
 
   /* 夜の進捗パネル — 記録ボタンの直上に5人固定（ROADMAP §12.10） */
   #reqboard{position:relative;z-index:3;width:min(560px,94vw);margin:18px auto 0;
@@ -758,7 +774,7 @@ const yen=n=>n.toLocaleString();
 </script>
 <script src="src/species.js?v=20260731-2"></script>
 <script src="src/world.js?v=20260731-16"></script>
-<script src="src/requests.js?v=20260731-16"></script>
+<script src="src/requests.js?v=20260731-17"></script>
 <script src="src/physics.js?v=20260731-2"></script>
 <script src="src/scoring.js?v=20260731-2"></script>
 <script src="src/ui/dial.js?v=20260731-2"></script>
@@ -767,7 +783,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-2"></script>
 <script src="src/tutorial.js?v=20260731-2"></script>
-<script src="src/game.js?v=20260731-16"></script>
+<script src="src/game.js?v=20260731-17"></script>
 <script src="src/scene3d.js?v=20260731-2"></script>
 <script>
 (() => {

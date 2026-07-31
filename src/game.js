@@ -235,22 +235,23 @@ function toMap(){
 /* 甲斐犬の一段目 — 翌日どの林が当たりかを予報する。
    夜明けに全5林の16本が確定しているので、実値を読める（SPEC §16.2）。
    「たぶん良い」ではなく「本当に良い」を教える能力（ROADMAP §11.7）。 */
-function forecastLine(f){
+function kaiForecast(f){
   if(!hasDog('kai'))return '';
   const list=WORLD.stands?.[f.id]; if(!Array.isArray(list))return '';
   const alive=list.filter(t=>!t.cut);
   const toku=alive.filter(t=>t.grade==='特等').length;
   const ichi=alive.filter(t=>t.grade==='一等').length;
   const score=toku*2+ichi;
-  const mark=score>=6?'◎◎◎':score>=4?'◎◎':score>=2?'◎':'—';
-  return `<div class="calc" style="text-align:left">
-    <span class="mid">${DOGS.kai.name}</span>　${mark}
-    　<span class="off">特等 ${toku}・一等 ${ichi}</span></div>`;
+  const face=score>=6?'happy':score>=2?'normal':'curious';
+  return `<span class="kai-forecast"><img src="assets/kai-face-${face}.png" alt="${DOGS.kai.name}">
+    <b>特等 ${toku}　一等 ${ichi}</b></span>`;
 }
 function previewForest(i){
   if(!FORESTS[i])return;
   $('map-bg').src=FOREST_ART(i);
   $('map-bg').className=`forest-scene tone-${i}`;
+  const old=document.querySelector('.kai-forecast');if(old)old.remove();
+  const h=$('map-h');if(h)h.insertAdjacentHTML('beforeend',kaiForecast(FORESTS[i]));
 }
 function drawMap(){
   $('mapcards').innerHTML=FORESTS.map((f,i)=>{
@@ -296,7 +297,7 @@ function drawMap(){
       <div class="fr"><span>平均の太さ</span><b>${Math.round(f.avgD*100)}cm</b></div>
       <div class="fr"><span>残り本数</span><b class="${st.c}">${f.stock} / ${f.maxStock}</b></div>
       <div class="fr"><span>林の状態</span><b class="${st.c}">${st.n}</b></div>
-      <div class="fore"><span class="lb">出る品等の目安</span><b>${gradeRange(f)}</b>${forecastLine(f)}</div>
+      <div class="fore"><span class="lb">出る品等の目安</span><b>${gradeRange(f)}</b></div>
       <div class="note">${gap>90?'まだ行ったことがない。':`前回から ${gap} 日`}${
         f.care>=60?'　枝打ちが効いてきている。':''}</div>
       <div class="cost"><em>移動に使う体力</em><b class="${ok?'':'ng'}">${cost>0?'−'+cost:'0'}</b></div>
@@ -925,9 +926,9 @@ function drawNight(){
       const stage=log.furniture?log.furniture:(log.processed||0)>=1?'板':'丸太';
       const dry=log.dried||log.furniture?'<b class="ok">乾燥済み</b>':`あと ${left}日`;
       return `<tr>
-        <td><button data-hold-log="${i}" class="hold-lock ${log.held?'sel':''}"
+        <td><button data-hold-log="${i}" class="hold-star ${log.held?'sel':''}"
           title="${log.held?'保持を外す':'この材を保持する'}" aria-label="${log.held?'保持中':'保持していない'}">${
-            log.held?'🔒':'🔓'}</button></td>
+            log.held?'★':'☆'}</button></td>
         <td>${log.name}</td><td>${log.grade}</td>
         <td><b class="mid">${yen(logSaleValue(log))}円</b></td>
         <td><button data-sell-log="${i}">売る</button></td>
@@ -992,11 +993,14 @@ function drawNight(){
       ${WORLD.buildings.doma?`<div class="row"><span>土間に入れている</span><b class="ok">放っておいても ${BOND_DOMA_CAP} まで上がる</b></div>`
         :'<div class="row"><span>土間に入れると、放っておいてもなつく</span><b class="mid">「建てる」から</b></div>'}
       </div>`;
+    const hondenDone=!!(WORLD.unlocks.honden||WORLD.buildings.honden);
+    const kishuReady=!!(WORLD.unlocks.kishu&&hondenDone);
     html+=`<div class="shopcard"><h3>紀州犬</h3>
       <p>神の使い。飼うのではなく、神主から借りる。<br>
-      連れて入った林の手入れ度が100なら、植えた苗が<b>神木</b>になる。</p>
-      <div class="row"><b class="${WORLD.unlocks.kishu?'ok':'mid'}">${
-        WORLD.unlocks.kishu?'借りられる':'神主の信用が要る'}</b></div></div>`;
+      <b class="mid">本殿完成後</b>に借りられる。連れて入った林の手入れ度が100なら、
+      植えた苗が<b>神木</b>になる。</p>
+      <div class="row"><b class="${kishuReady?'ok':'mid'}">${
+        kishuReady?'借りられる':WORLD.unlocks.kishu?'本殿の完成を待つ':'神主の信用が要る'}</b></div></div>`;
     body.innerHTML=html;
     body.querySelectorAll('[data-adopt]').forEach(b=>b.onclick=()=>adoptDog(b.dataset.adopt));
     body.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>{
@@ -1210,7 +1214,7 @@ function adoptDog(k){
   nightMessage(`${d.name}を迎えた。明日から山へついてくる。`);
   drawNight();topbar();
   showStory({label:'新しい相棒',title:d.name,
-    body:`${d.name}を家へ迎えた。\n明日から山へついてくる。`,
+    body:`${d.name}を家へ迎えた。\n明日から山へついてくる。\n\n役割：${d.role}\n${d.s1.replace(/<[^>]+>/g,'')}`,
     button:'よろしくな',art:dogArt(k,'mascot')});
 }
 function mascotReact(kind){
