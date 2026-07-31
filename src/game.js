@@ -1061,7 +1061,7 @@ function nextDay(manualSlot=null){
   if(manualSlot)saveGame(manualSlot);
   toMap();
   if(showResolve)showStory({label:'二日目の朝',title:'あの日の祭りを、もう一度',
-    body:'夜明け前、倒れた社と、祭りの灯が夢に出た。\n社を再興して、あの日の祭りを取り戻したい。',
+    body:'夜明け前、倒れた社と、祭りの灯が夢に出た。\n社を再興して、あの日の祭りを取り戻したい。\n神主や村のみんなに連絡を取ってみよう。',
     button:'山へ向かう'});
   for(const k of bonds?.stageUps||[]){
     const d=DOGS[k];if(!d)continue;
