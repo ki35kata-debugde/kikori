@@ -1497,6 +1497,9 @@ function senseShown(t){
 }
 function dogImageFor(t){
   const k=mascotDog(); if(!k)return 'assets/bird-mascot.png';
+  /* 表情違い（happy/worried）の絵は、いまのところ柴犬にしかない。
+     他の犬種で試すと画像が無く、落ちた先で柴犬の絵に化けてしまう事故になる。 */
+  if(k!=='shiba')return dogArt(k,'mascot');
   const p=t?senseShown(t):'normal';
   return dogArt(k,p==='fine'?'happy':p==='rot'?'worried':'mascot');
 }
