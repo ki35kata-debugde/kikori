@@ -688,24 +688,53 @@ function toNight(){
   showTutorial('night');
 }
 /* 土間を直すと、犬が家の中（囲炉裏のそば）で眠る。 */
-let nightDogTimer=null;
+let nightDogTimer=null,nightDogRunToken=0;
 function updateNightDog(){
   const el=$('night-dog'); if(!el)return;
   const k=mascotDog();
+  const token=++nightDogRunToken;
   if(nightDogTimer){clearTimeout(nightDogTimer);nightDogTimer=null}
   if(!WORLD.buildings.doma||!k){el.classList.add('hide');el.src='';return}
   el.onerror=()=>el.classList.add('hide');
   el.alt=`土間で休む${DOGS[k].name}`;
   el.classList.remove('hide');
-  if(!DOG_HAS_SLEEP[k]){el.classList.remove('framed');el.src=dogArt(k,'mascot');return}
-  el.classList.add('framed');
-  let f=0;
-  const frame=()=>{
-    if(mascotDog()!==k||!WORLD.buildings.doma)return;
-    el.src=dogFrame(k,'sleep',f);f=(f+1)%DOG_ANIMS.sleep.frames;
-    nightDogTimer=setTimeout(frame,DOG_ANIMS.sleep.ms);
+  /* 起きている間は床を歩く。待機3回＋喜ぶ1回を2〜3セット見せてから、
+     その場で寝姿に切り替え、以後は横移動させない。 */
+  el.classList.remove('framed');
+  const sleep=()=>{
+    if(token!==nightDogRunToken||mascotDog()!==k||!WORLD.buildings.doma)return;
+    if(!DOG_HAS_SLEEP[k]){el.src=dogArt(k,'mascot');return}
+    el.classList.add('framed');
+    let f=0;
+    const sleepFrame=()=>{
+      if(token!==nightDogRunToken||mascotDog()!==k||!WORLD.buildings.doma)return;
+      el.src=dogFrame(k,'sleep',f);f=(f+1)%DOG_ANIMS.sleep.frames;
+      nightDogTimer=setTimeout(sleepFrame,DOG_ANIMS.sleep.ms);
+    };
+    sleepFrame();
   };
-  frame();
+  if(!DOG_HAS_FRAMES[k]){
+    el.src=dogArt(k,'mascot');
+    nightDogTimer=setTimeout(sleep,12500);
+    return;
+  }
+  const repeats=2+((WORLD.day+['shiba','akita','kai','kishu'].indexOf(k))%2);
+  const states=Array.from({length:repeats},()=>['idle','idle','idle','joy']).flat();
+  let stateAt=0;
+  const awakeState=()=>{
+    if(token!==nightDogRunToken)return;
+    if(stateAt>=states.length){sleep();return}
+    const state=states[stateAt++],cfg=DOG_ANIMS[state];
+    let f=0;
+    const awakeFrame=()=>{
+      if(token!==nightDogRunToken||mascotDog()!==k)return;
+      el.src=dogFrame(k,state,f);f++;
+      if(f<cfg.frames){nightDogTimer=setTimeout(awakeFrame,cfg.ms);return}
+      nightDogTimer=setTimeout(awakeState,state==='joy'?650:300);
+    };
+    awakeFrame();
+  };
+  awakeState();
 }
 const TAB_ICONS={
   tools:'<path d="M5 15l6-6m-1-4l4-2 2 2-2 4-4-4zM3 17l3-3"/>',
