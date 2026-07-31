@@ -412,6 +412,13 @@
     line-height:2.15;color:#ddd8ca}
   #story-art{display:block;width:150px;height:150px;object-fit:contain;margin:0 auto 8px;
     filter:drop-shadow(0 7px 12px rgba(0,0,0,.45))}
+  #loadov{z-index:102;background:rgba(9,11,10,.94);backdrop-filter:blur(5px)}
+  #loadcard{width:min(560px,92vw);padding:25px 26px;border-radius:4px;text-align:center;
+    background:rgba(16,19,16,.98);border:1px solid rgba(212,169,78,.34);
+    box-shadow:0 14px 40px rgba(0,0,0,.58)}
+  #loadcard h1{font-size:23px;margin-bottom:18px}
+  #title-loads{display:grid;gap:9px}
+  #title-loads button{width:100%;white-space:normal;line-height:1.5;text-align:left;padding:12px 14px}
 
   /* 冒頭の物語と手ほどき。挨拶画面と同じ枠を使い、新しい素材は増やさない */
   #tutov{background:rgba(9,11,10,.94);backdrop-filter:blur(4px);z-index:44}
@@ -681,6 +688,16 @@
   </div>
 </div>
 
+<!-- タイトルから記録を選んで読み込む -->
+<div id="loadov" class="ov hide">
+  <div id="loadcard">
+    <span class="lb">つづきから</span>
+    <h1>読み込む記録を選ぶ</h1>
+    <div id="title-loads"></div>
+    <div style="margin-top:18px"><button id="title-load-cancel">タイトルへ戻る</button></div>
+  </div>
+</div>
+
 <!-- 冒頭の物語と手ほどき -->
 <div id="tutov" class="ov hide">
   <div id="tutcard">
@@ -726,7 +743,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-2"></script>
 <script src="src/tutorial.js?v=20260731-2"></script>
-<script src="src/game.js?v=20260731-7"></script>
+<script src="src/game.js?v=20260731-8"></script>
 <script src="src/scene3d.js?v=20260731-2"></script>
 <script>
 (() => {
@@ -740,8 +757,17 @@ const yen=n=>n.toLocaleString();
   };
   $('title-continue').disabled=firstRun;
   $('title-continue').onclick=()=>{
-    closeTitle(); loadGame('auto');
+    const box=$('title-loads');
+    box.innerHTML=['auto','manual1','manual2'].map(slot=>{
+      const has=!!readRecord(slot)?.world;
+      return `<button data-title-load="${slot}" ${has?'':'disabled'}>${recordText(slot)}</button>`;
+    }).join('');
+    box.querySelectorAll('[data-title-load]').forEach(b=>b.onclick=()=>{
+      $('loadov').classList.add('hide');closeTitle();loadGame(b.dataset.titleLoad);
+    });
+    $('loadov').classList.remove('hide');
   };
+  $('title-load-cancel').onclick=()=>$('loadov').classList.add('hide');
 })();
 </script>
 

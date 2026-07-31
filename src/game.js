@@ -695,7 +695,14 @@ function updateNightDog(){
   const token=++nightDogRunToken;
   if(nightDogTimer){clearTimeout(nightDogTimer);nightDogTimer=null}
   if(!WORLD.buildings.doma||!k){el.classList.add('hide');el.src='';return}
-  el.onerror=()=>el.classList.add('hide');
+  el.onerror=()=>{
+    /* コマ画像が欠けても犬そのものは消さず、一枚絵に戻す。 */
+    nightDogRunToken++;
+    if(nightDogTimer){clearTimeout(nightDogTimer);nightDogTimer=null}
+    el.onerror=null;el.classList.remove('hide');el.classList.add('framed');
+    el.style.animation='none';el.style.transform='scaleX(-1)';
+    el.src=dogArt(k,'mascot');
+  };
   el.alt=`土間で休む${DOGS[k].name}`;
   el.classList.remove('hide');
   /* 柴犬だけ、起きている間は床を歩く。待機3回＋大喜び1回を2〜3セット後、
