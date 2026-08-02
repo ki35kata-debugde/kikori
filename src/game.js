@@ -582,9 +582,8 @@ function showResult(){
     if(mode==='request')deliverToRequest(T,reqId);
     settled=true;$('result').classList.remove('show');next();
   };
-  B(`売る　${yen(pay)}円`,'key',()=>finish('sell',toForest));
-  B(`取っておく　${WORLD.lumber.length}/${cap}`,'',()=>finish('keep',toForest),WORLD.lumber.length>=cap);
   let saplingUsed=false;
+  /* 苗を植える選択肢は一番前に出す（売る・取っておくより先） */
   if(rank==='S')B(`苗木を使う（手入れ＋3）　残り${WORLD.inv.sapling}`,
     WORLD.inv.sapling>0?'key':'',e=>{
       if(saplingUsed||WORLD.inv.sapling<1)return;
@@ -595,6 +594,8 @@ function showResult(){
       $('advice').textContent=`苗木を植えた。${f.name}の手入れ度が ${Math.round(f.care)} になり、残り本数と上限も1本増えた。`;
       topbar();
     },WORLD.inv.sapling<1);
+  B(`売る　${yen(pay)}円`,'key',()=>finish('sell',toForest));
+  B(`取っておく　${WORLD.lumber.length}/${cap}`,'',()=>finish('keep',toForest),WORLD.lumber.length>=cap);
   /* 合う依頼が複数あることがあるので、相手ごとにボタンを出す */
   for(const r of WORLD.requests){
     if(partIndexFor(r,T)<0)continue;
