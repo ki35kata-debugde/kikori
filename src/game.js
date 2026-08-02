@@ -770,16 +770,16 @@ function toEvening(){
     :dogForage>=5?'木の実を拾ったようだ'
     :'今日は何も見つけられなかったようだ';
   const kaiForageIcon=`<img class="kai-forage-face" src="assets/kai-face-${dogFace}.png" alt="${DOGS.kai.name}">`;
-  $('ev-sub').innerHTML=`${WORLD.day}日目が終わる。体力の残り <b class="mn">${Math.round(WORLD.stamina)}</b>　—　選べるのは<b>ひとつだけ</b>。`
-    +(dogStage('kai')>=2?`<br><span class="kai-forage-line">${kaiForageIcon}<g>${DOGS.kai.name}が${forageWords}　明日 +${dogForage}</g></span>　この一枠は使わない。`:'');
+  $('ev-sub').innerHTML=`${WORLD.day}日目が終わる。体力の残り <b class="mn">${Math.round(WORLD.stamina)}</b>　—　選べるのは<b>ひとつだけ</b>。`;
   $('evcards').innerHTML=EVE.map((e,i)=>{
     const ok=e.ok();
-    /* 犬が採る日は、山菜の札に犬の印を出して「もう済んでいる」ことを示す */
+    /* 犬が採る日は、山菜の札を犬の結果報告に置き換える。暗く見せると読みにくいので、
+       選べない（data-e なし）だけで見た目は他のカードと同じ明るさにする */
     const byDog=e.k==='forage'&&dogStage('kai')>=2;
-    return `<div class="ecard ${ok&&!byDog?'':'dis'}" ${ok&&!byDog?`data-e="${i}"`:''}>
-      <h3>${byDog?'🐕 ':''}${e.t}</h3><div class="c">${byDog?'犬が行く':e.c}</div>
-      <div class="e">${byDog?`<span class="kai-forage-line">${kaiForageIcon}${DOGS.kai.name}が${forageWords}</span>`:e.e}</div>
-      <div class="k">${byDog?`明日 +${dogForage}　済み`:e.kicker()}</div></div>`}).join('');
+    return `<div class="ecard ${ok||byDog?'':'dis'}" ${ok&&!byDog?`data-e="${i}"`:''}>
+      <h3>${e.t}</h3><div class="c">${byDog?'犬が行く':e.c}</div>
+      <div class="e">${byDog?`<span class="kai-forage-line">${kaiForageIcon}<span>甲斐犬が代わりに行ってくれた。<br>結果、${forageWords}${dogForage?`(+${dogForage})`:''}。</span></span>`:e.e}</div>
+      <div class="k">${byDog?`明日 +${dogForage}`:e.kicker()}</div></div>`}).join('');
   $('evcards').querySelectorAll('[data-e]').forEach(el=>el.onclick=()=>{
     const e=EVE[+el.dataset.e];
     if(e.k==='craft'){drawCraftChoice();return}
@@ -859,7 +859,8 @@ function shrinePartReveal(i){
 function shrinePartsHTML(){
   return SHRINE_PART_LAYOUT.map((p,i)=>
     `<div class="shrine-part" style="left:${p.left}%;top:${p.top}%;width:${p.width}%;height:${p.height}%">
-      <img src="${p.src}" alt="" style="--reveal:${shrinePartReveal(i)}%"></div>`).join('');
+      <img class="shrine-part-mono" src="${p.src}" alt="">
+      <img class="shrine-part-color" src="${p.src}" alt="" style="--reveal:${shrinePartReveal(i)}%"></div>`).join('');
 }
 const partLabel=p=>{
   const bits=[SPECIES[p.species]?.name||p.species];
@@ -1246,7 +1247,7 @@ function drawNight(){
     const stage=WORLD.shrine.stage,def=SHRINE_STAGES[stage];
     if(!def){
       body.innerHTML=`<div class="shrine-panel">
-        <div class="shrine-picture"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
+        <div class="shrine-picture"><img src="assets/shrine-complete.png" alt="">
           ${shrinePartsHTML()}</div>
         <h2>本殿完成</h2><p>祭りを取り戻した。山での暮らしは、これからも続く。</p>
         <button data-ending>祭りの夜を思い出す</button></div>`;
@@ -1257,7 +1258,7 @@ function drawNight(){
         return `<div class="tr"><span>${partLabel(p)}</span><b class="${now>=p.need?'ok':'mid'}">${now} / ${p.need}本</b></div>`;
       }).join('');
       body.innerHTML=`<div class="shrine-panel">
-        <div class="shrine-picture"><img class="shrine-mono" src="assets/shrine-complete.png" alt="">
+        <div class="shrine-picture"><img src="assets/shrine-complete.png" alt="">
           ${shrinePartsHTML()}</div>
         <div class="shrine-copy"><span class="lb">社の再建　${stage+1} / 5</span><h2>${def.name}</h2>
           <p>材を納めるたび、${def.name}に色が戻る。建材は「材木倉庫」から一本ずつ納める。</p>
@@ -1629,6 +1630,9 @@ function nextDay(manualSlot=null){
     WORLD.morning.ownerFavor=n?{forest:WORLD.ownerFavorPending,n}:null;
     WORLD.ownerFavorPending=null;
   }
+  /* 手入れ度が今朝の更新でちょうど条件を満たした場合の取りこぼしを拾う。
+     dailyGrowth() / applyKamidanaCare() のあとに呼ぶこと（1日遅れの原因だった）。 */
+  sweepPassiveRequests();
   const showResolve=WORLD.day===2&&!WORLD.storyFlags.shrineResolve;
   if(showResolve)WORLD.storyFlags.shrineResolve=true;
   saveGame('auto');

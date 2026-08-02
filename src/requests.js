@@ -372,7 +372,12 @@ function noteDayEnd(){
     if(g.kind==='kamiday'&&(WORLD.forestsToday||[]).length===0)r.progress++;
     if(reqDone(r))completeRequest(r);
   }
-  /* 手入れ度と道は世界の状態から導くので、達成の取りこぼしをここで拾う */
+}
+/* 手入れ度・道など「世界の状態から導く」達成の取りこぼしを拾う。
+   dailyGrowth() / applyKamidanaCare() など、その朝の手入れ度更新が
+   終わったあとに呼ぶこと。noteDayEnd() より先に呼ぶと、神棚の守り等で
+   ちょうど条件を満たした日の判定が翌日まで1日遅れてしまう。 */
+function sweepPassiveRequests(){
   for(const r of [...(WORLD.requests||[])])if(reqDone(r))completeRequest(r);
 }
 const kamiDay=(d=WORLD.day)=>d%12===0;
