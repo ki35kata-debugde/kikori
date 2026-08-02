@@ -556,8 +556,11 @@ function showResult(){
 
   // 林への反映（売る・取っておく・依頼へ納めるの決定は下で行う）
   const f=FORESTS[WORLD.at];
-  f.stock=Math.max(0,f.stock-1);
-  f.avgD=clamp(f.avgD+(T.D<f.avgD?0.004:-0.006),0.18,0.62);
+  /* 神木は林の本数・太さの勘定に入らない（社と像にしか使えない別枠） */
+  if(!T.sacred){
+    f.stock=Math.max(0,f.stock-1);
+    f.avgD=clamp(f.avgD+(T.D<f.avgD?0.004:-0.006),0.18,0.62);
+  }
   if(f.stumps.length<24&&nodes[sel])
     f.stumps.push({x:nodes[sel].pos.x,z:nodes[sel].pos.z,r:T.D/2});
   if(nodes[sel]){nodes[sel].cut=true;nodes[sel].group.visible=false;
@@ -572,8 +575,22 @@ function showResult(){
   const cap=lumberCapacity();
   /* 採点を木に残す。納品条件（採点B以上）と倉庫の記録に使う */
   T.rank=rank;
-  /* 行い型の依頼（事故なく／間伐）と、その日の会心数を数える */
-  noteFell({rank,accident:S.barber||S.over,D:T.D});
+  /* 行い型の依頼（事故なく／間伐）と、その日の会心数を数える。神木は数えない */
+  if(!T.sacred)noteFell({rank,accident:S.barber||S.over,D:T.D});
+
+  if(T.sacred){
+    /* 神木は売る・取っておく・依頼のどれにも回らない。伐った時点で像の材になる */
+    const s=(WORLD.shinboku||[]).find(x=>x.tree===T);
+    if(s){s.felled=true;s.rank=rank;s.grade=T.grade;s.species=T.id;
+      s.accident=!!(S.barber||S.over)}
+    $('pay').innerHTML='売れない<u> 神木として捧げる</u>';
+    B('神木を持ち帰る','key',()=>{$('result').classList.remove('show');toForest()});
+    if(total>=74)soundSuccess();
+    $('result').classList.add('show');
+    showTutorial('result');
+    return;
+  }
+
   let settled=false;
   const finish=(mode,next,reqId)=>{
     if(settled)return;
@@ -583,11 +600,21 @@ function showResult(){
     settled=true;$('result').classList.remove('show');next();
   };
   let saplingUsed=false;
+  /* 手入れ度100・紀州犬解禁・その林の神木がまだ3本未満なら、苗が神木の苗になる */
+  const shinbokuReady=WORLD.unlocks.kishu&&f.care>=100&&
+    shinbokuCount(f.id)<3&&!(WORLD.statues?.done||[]).includes(f.id);
   /* 苗を植える選択肢は一番前に出す（売る・取っておくより先） */
-  if(rank==='S')B(`苗木を使う（手入れ＋3）　残り${WORLD.inv.sapling}`,
+  if(rank==='S')B(shinbokuReady?'神木の苗を植える':`苗木を使う（手入れ＋3）　残り${WORLD.inv.sapling}`,
     WORLD.inv.sapling>0?'key':'',e=>{
       if(saplingUsed||WORLD.inv.sapling<1)return;
       WORLD.inv.sapling--;saplingUsed=true;
+      if(shinbokuReady){
+        WORLD.shinboku.push({forest:f.id,plantedDay:WORLD.day,tree:null,felled:false});
+        e.currentTarget.textContent='神木の苗を植えた';
+        e.currentTarget.disabled=true;e.currentTarget.className='';
+        $('advice').textContent=`${f.name}に神木の苗を植えた。十五日ほどで育つ。`;
+        return;
+      }
       f.stock=Math.min(f.maxStock+1,f.stock+1);f.maxStock++;f.care=clamp(f.care+3,0,100);
       e.currentTarget.textContent=`苗木を植えた（手入れ ${Math.round(f.care)}）`;
       e.currentTarget.disabled=true;e.currentTarget.className='';
@@ -863,6 +890,41 @@ function shrinePartsHTML(){
       <img class="shrine-part-mono" src="${p.src}" alt="">
       <img class="shrine-part-color" src="${p.src}" alt="" style="--reveal:${shrinePartReveal(i)}%"></div>`).join('');
 }
+
+/* ══════════ 木像（宮大工・2026-08-01の決定） ══════════
+   5つの林それぞれに1体、神木丸太3本＋お金＋その他の材木で打つ。
+   お金・材料は何体目かで増える（林の順序は問わない）。 */
+const STATUE_COST=[
+  {money:100000,parts:[{species:'sugi',need:2}]},
+  {money:150000,parts:[{species:'hinoki',need:2}]},
+  {money:200000,parts:[{species:'nara',need:2}]},
+  {money:280000,parts:[{species:'sugi',grade:'一等',need:3}]},
+  {money:380000,parts:[{species:'hinoki',grade:'一等',need:3}]}
+];
+const statueDone=fid=>(WORLD.statues?.done||[]).includes(fid);
+const shinbokuLogsFor=fid=>(WORLD.shinboku||[]).filter(s=>s.forest===fid&&s.felled);
+function finishStatue(fid){
+  const cost=STATUE_COST[WORLD.statues.done.length];
+  if(!cost||statueDone(fid))return;
+  const logs=shinbokuLogsFor(fid);
+  if(logs.length<3||WORLD.money<cost.money)return;
+  const plan=materialPlan(cost.parts); if(!plan)return;
+  WORLD.money-=cost.money; spendBuildLumber(plan);
+  /* 使った神木丸太3本を取り除く */
+  let left=3;
+  WORLD.shinboku=WORLD.shinboku.filter(s=>{
+    if(left>0&&s.forest===fid&&s.felled){left--;return false}
+    return true;
+  });
+  WORLD.statues.done.push(fid);
+  soundSuccess();
+  nightMessage(`${FORESTS[fid].name}の木像が打ちあがった。`);
+  drawNight();topbar();
+  if(WORLD.statues.done.length===5)
+    showStory({label:'木像',title:'五つの台座',
+      body:'五つの林、五つの木像。すべての台座に、山の姿が揃った。\n\n宮大工は、いつの間にか姿を消していた。',
+      button:'山を見渡す'});
+}
 const partLabel=p=>{
   const bits=[SPECIES[p.species]?.name||p.species];
   if(p.bornGrade==='特等')bits.push('伐った時から特等');
@@ -969,6 +1031,11 @@ function showFestivalEnding(){
   if(!WORLD.ending.completed){
     WORLD.ending={completed:true,day:WORLD.day,viewed:true};
     WORLD.unlocks.kishu=true;
+    /* 紀州犬は迎えるのではなく自然と連れてくる。なつき度・餌はそのまま持たせておく
+       （今は使わないが、将来また意味を持たせるかもしれない）。 */
+    if(!WORLD.dogs.kishu)WORLD.dogs.kishu={bond:0};
+    WORLD.statues.unlocked=true;
+    WORLD.storyFlags.kishuPending=true;
   }
   showStory({label:'本殿完成',title:'祭りの灯',
     body:'鳥居に注連縄が張られた。\n手水舎に水が戻り、拝殿の前に提灯が並んだ。\n\n笛が鳴る。\n途絶えていた祭りが、もう一度始まった。',
@@ -979,6 +1046,9 @@ function showFestivalEnding(){
   showStory({label:'祭りの夜',title:'白い犬',
     body:'祭りの笛が鳴り始めたころ、一頭の白い犬が鳥居をくぐってきた。\n\n神主が、しばらく言葉を失った。\n\n「……前の神主が、神様の使いとして山へ連れていた紀州犬です」\n\n犬は境内をひと回りすると、こちらの前で座った。',
     button:'一緒に山へ行こう',art:dogArt('kishu','mascot')});
+  showStory({label:'祭りの夜',title:'宮大工',
+    body:'祭りの隅に、見覚えのない老人が佇んでいた。真っ白な髭を風になびかせ、杖の代わりに鑿を手にしている。\n\n「……宮大工と呼ばれておる者じゃ。本殿の仕上げに、ひと役買わせてもらった。\n\nその白い犬がついてきたか。……山も、そなたを認めたということじゃろう。\n手入れ度が満ちた林には、いずれ神木が宿る。伐ってよい。ただし、神のためにだけな。\n\n三本集まれば、木像がひとつ打てる。五つの林、五つの台座……気の長い話じゃがな」',
+    button:'肝に銘じる'});
   showStory({label:'これから',title:'山での暮らしは続く',
     body:`本殿を完成させ、祭りを取り戻した。\n${WORLD.day}日目。\n\n紀州犬が山へついてくるようになった。\n手入れ度100の林では、苗が神木へ育つことがある。`,
     button:'山へ戻る',onConfirm:()=>setBgmScene('night')});
@@ -1056,7 +1126,8 @@ const TAB_ICONS={
   dogs:'<path d="M6 9c-3-1-3-5-1-6l3 3h4l3-3c2 1 2 5-1 6v5c-2 3-6 3-8 0V9zM8 11h.1M12 11h.1M9 14h2"/>',
   build:'<path d="M3 9l7-6 7 6v8H3V9zm5 8v-5h4v5"/>',
   requests:'<path d="M5 3h10v14H5V3zm2 4h6M7 10h6M7 13h4"/>',
-  shrine:'<path d="M3 8h14M5 8v8m10-8v8M2 16h16M4 6l6-3 6 3"/>'
+  shrine:'<path d="M3 8h14M5 8v8m10-8v8M2 16h16M4 6l6-3 6 3"/>',
+  statue:'<path d="M10 3a2 2 0 100 4 2 2 0 000-4zM7 9h6l1 6H6l1-6zM5 17h10"/>'
 };
 const iconSvg=k=>`<span class="tabico"><svg viewBox="0 0 20 20" aria-hidden="true">${TAB_ICONS[k]||''}</svg></span>`;
 function drawNight(){
@@ -1064,6 +1135,7 @@ function drawNight(){
   $('night-money').textContent=yen(WORLD.money)+'円';
   const tabs=[['tools','道具'],['goods','消耗品'],['dogs','犬'],['build','建てる'],['requests','依頼'],
     ...(WORLD.shrine?.started||WORLD.shrine?.stage>0||WORLD.ending?.completed?[['shrine','社の再建']]:[]),
+    ...(WORLD.statues?.unlocked?[['statue','木像']]:[]),
     ['lumber','材木倉庫']];
   $('nighttabs').innerHTML=tabs.map(([k,n])=>{
     const isNew=k==='requests'&&newRequestWaiting();
@@ -1268,6 +1340,24 @@ function drawNight(){
         </div></div>`;
       body.querySelector('[data-finish-shrine]').onclick=finishShrineStage;
     }
+  }else if(NIGHT_TAB==='statue'){
+    const doneCount=WORLD.statues.done.length,cost=STATUE_COST[doneCount];
+    const cards=FORESTS.map(f=>{
+      const done=statueDone(f.id),logs=shinbokuLogsFor(f.id);
+      if(done)return `<div class="shopcard"><h3>${f.name}</h3><p>木像が打ちあがっている。</p></div>`;
+      const ready=logs.length>=3;
+      const partsLine=cost?cost.parts.map(p=>partLabel(p)+`×${p.need}`).join('、'):'';
+      return `<div class="shopcard"><h3>${f.name}</h3>
+        <div class="row"><span>神木の丸太</span><b class="${ready?'ok':'mid'}">${logs.length} / 3本</b></div>
+        ${cost?`<p>職人への謝礼 ${yen(cost.money)}円　＋　${partsLine}</p>
+        <button data-statue="${f.id}" ${ready&&WORLD.money>=cost.money&&materialPlan(cost.parts)?'':'disabled'}>木像を打つ</button>`
+        :'<p>すべての木像が打ちあがった。</p>'}</div>`;
+    }).join('');
+    body.innerHTML=`<div class="statue-panel">
+      <p style="grid-column:1/-1;font-size:11px;color:#aaa69b;margin-bottom:2px">
+        手入れ度100の林に、紀州犬を連れて苗を植えると神木が育つ（十五日）。三本集まった林から、木像を打てる。</p>
+      ${cards}</div>`;
+    body.querySelectorAll('[data-statue]').forEach(b=>b.onclick=()=>finishStatue(+b.dataset.statue));
   }else{
     /* 受注中 → 頼まれている → 済んだこと の3区分（ROADMAP §12.1） */
     let html='';
@@ -1459,9 +1549,12 @@ function buyGood(k,n){
    3頭とも連れて歩くので、姿は選べる（WORLD.mascot）。
    絵は assets/<犬>-mascot.png を探し、無ければ柴犬の絵を借りて色を変える。
    秋田犬と甲斐犬の透過PNGを置けば、そのまま本物に切り替わる。 */
+/* 紀州犬はなつき度だけ持ち、昼のマスコットには出さない（DOGS に絵・能力の登録が無い）。
+   マスコットの候補からは常に除く。 */
 const mascotDog=()=>{
   const k=WORLD.mascot;
-  return k&&hasDog(k)?k:(Object.keys(WORLD.dogs||{})[0]||null);
+  if(k&&hasDog(k)&&DOGS[k])return k;
+  return Object.keys(WORLD.dogs||{}).find(x=>DOGS[x])||null;
 };
 function dogArt(k,mood='mascot'){
   return k==='shiba'?`assets/shiba-${mood}.png`:`assets/${k}-${mood}.png`;
@@ -1642,6 +1735,12 @@ function nextDay(manualSlot=null){
   if(showResolve)showStory({label:'二日目の朝',title:'あの日の祭りを、もう一度',
     body:'夜明け前、倒れた社と、祭りの灯が夢に出た。\n社を再興して、あの日の祭りを取り戻したい。\n神主や村のみんなに連絡を取ってみよう。',
     button:'山へ向かう'});
+  if(WORLD.storyFlags.kishuPending){
+    WORLD.storyFlags.kishuPending=false;
+    showStory({label:'朝',title:'紀州犬',
+      body:'紀州犬がついてきた。\n手入れ度が100の林では、祝福を受けて神木の苗となりそうだ。',
+      button:'わかった'});
+  }
   for(const k of bonds?.stageUps||[]){
     const d=DOGS[k];if(!d)continue;
     showStory({label:'絆が深まった',title:`${d.name}が、もっと頼れる相棒になった`,

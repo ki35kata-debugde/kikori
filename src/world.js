@@ -104,7 +104,11 @@ Object.assign(WORLD,{
   ending:{completed:false,day:null,viewed:false},
   unlocks:{doghouse:false,workshop:false,miyama:false,snow:false,master:false},
   morning:{carry:0,bento:0},
-  stands:{},pendingCut:null
+  stands:{},pendingCut:null,
+  /* 神木・木像。1つの林につき3本まで（育成中＋伐採済みの合計）。
+     全15本、5つの林それぞれに木像が1体ずつできる。 */
+  shinboku:[],             // {forest, plantedDay, tree, felled}
+  statues:{unlocked:false,done:[]} // done: 完成した林idを完成順に
 });
 /* 依頼と信用（ROADMAP §12）。同時受注は3件 */
 Object.assign(WORLD,{
@@ -169,6 +173,9 @@ function normalizeWorld(){
     paid:Array.from({length:5},(_,i)=>!!shrine.paid?.[i])
   };
   WORLD.ending={completed:false,day:null,viewed:false,...(WORLD.ending||{})};
+  if(!Array.isArray(WORLD.shinboku))WORLD.shinboku=[];
+  WORLD.statues={unlocked:false,done:[],...(WORLD.statues||{})};
+  if(!Array.isArray(WORLD.statues.done))WORLD.statues.done=[];
   /* 旧セーブの WORLD.dog（'shiba' か true）を3頭形式へ移す */
   if(typeof WORLD.dogs!=='object'||WORLD.dogs===null)WORLD.dogs={};
   if(WORLD.dog&&!WORLD.dogs.shiba)WORLD.dogs.shiba={bond:0};
@@ -261,12 +268,33 @@ function stockState(f){
   return r>=0.70?{n:'健全',c:'ok'}:r>=0.40?{n:'疎になった',c:'mid'}:{n:'荒れた',c:'ng'};
 }
 
+/* ══════════ 神木（ROADMAP §11.6・2026-08-01の決定） ══════════
+   紀州犬を連れ、手入れ度100の林に植えた苗が神木になる。1林につき3本まで
+   （育成中＋伐採済み未消費の合計）。育つのに15日。伐倒は通常の伐倒ミニゲーム
+   を経由するので、成木になったらその林の立ち木（WORLD.stands）へ加える。 */
+const SHINBOKU_GROW_DAYS=15;
+function shinbokuCount(forestId){
+  return (WORLD.shinboku||[]).filter(s=>s.forest===forestId).length;
+}
+function makeShinboku(f){
+  const t=makeTree(f,{minG:66});
+  t.sacred=true;
+  t.name=`${f.name}の神木`;
+  return t;
+}
 function prepareDailyStands(){
   const pending=WORLD.pendingCut;
   const carried=pending&&WORLD.stands?.[pending.forestId]?.[pending.treeIndex];
   WORLD.stands={};
   for(const f of FORESTS)WORLD.stands[f.id]=generateStand(f);
   if(carried)WORLD.stands[pending.forestId][pending.treeIndex]=carried;
+  /* 育ち終えて、まだ伐っていない神木をその林の一覧の末尾に加える */
+  (WORLD.shinboku||[]).forEach(s=>{
+    if(s.felled)return;
+    if(WORLD.day<s.plantedDay+SHINBOKU_GROW_DAYS)return;
+    if(!s.tree)s.tree=makeShinboku(FORESTS[s.forest]);
+    if(WORLD.stands[s.forest])WORLD.stands[s.forest].push(s.tree);
+  });
 }
 function ensureDailyStands(){
   if(!WORLD.stands||FORESTS.some(f=>!Array.isArray(WORLD.stands[f.id])||WORLD.stands[f.id].length<16))

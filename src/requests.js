@@ -222,6 +222,7 @@ function partMatches(p,t){
 }
 /* この木がその依頼のどの part を進められるか。無ければ −1 */
 function partIndexFor(req,t){
+  if(t.sacred)return -1;   // 神木は依頼に納められない。社と像にしか使えない
   const d=reqDef(req.id); if(!d||d.give.kind!=='deliver')return -1;
   return d.give.parts.findIndex((p,i)=>req.progress[i]<p.need&&partMatches(p,t));
 }

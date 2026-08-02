@@ -421,10 +421,15 @@ function drawList(){
   const rows=stand.map((t,i)=>({...t,req:requestMatches(t)?1:0,sense:dogSense(t),i})).filter(t=>!nodes[t.i].cut);
   rows.sort((a,b)=>{const x=a[sortKey],y=b[sortKey];
     return (typeof x==='string'? x.localeCompare(y) : x-y)*sortDir});
+  /* 育成中の神木は伐倒できないので、選べない案内行として先頭に出す */
+  const growing=(WORLD.shinboku||[]).filter(s=>s.forest===WORLD.at&&!s.tree&&!s.felled);
+  const growingRows=growing.map(s=>
+    `<tr class="dis"><td colspan="${cols.length}">${FORESTS[s.forest].name}の神木（あと${
+      Math.max(0,s.plantedDay+SHINBOKU_GROW_DAYS-WORLD.day)}日で育つ）</td></tr>`).join('');
   $('ltab').innerHTML=`<table><thead><tr>${
     cols.map(c=>`<th data-k="${c[0]}">${c[1]}${sortKey===c[0]?(sortDir>0?' ▲':' ▼'):''}</th>`).join('')
-  }</tr></thead><tbody>${
-    rows.map(t=>`<tr data-i="${t.i}" class="${t.i===sel?'on':''}">
+  }</tr></thead><tbody>${growingRows}${
+    rows.map(t=>`<tr data-i="${t.i}" class="${t.i===sel?'on':''}${t.sacred?' sacred-row':''}">
       <td class="mid">${t.req?'★':''}</td>${hasDog('shiba')?`<td class="mid dog-sense ${treePotential(t)}">${dogSenseMark(t)}</td>`:''}<td>${t.name}</td><td>${t.grade}</td>
       <td>${Math.round(t.D*100)}cm</td>
       <td>${yen(t.price)}</td>
@@ -434,7 +439,7 @@ function drawList(){
     const k=th.dataset.k;
     if(sortKey===k)sortDir*=-1; else {sortKey=k;sortDir=(k==='name'||k==='grade')?1:-1}
     drawList()});
-  $('ltab').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{
+  $('ltab').querySelectorAll('tbody tr[data-i]').forEach(tr=>tr.onclick=()=>{
     selectTree(+tr.dataset.i); $('listov').classList.add('hide')});
 }
 
