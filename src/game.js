@@ -888,16 +888,10 @@ function shrinePartsHTML(){
   /* 奥行きの重なり順。top（画面上の高さ）が大きいほど手前にあるので、
      手前のものほど z-index を高くする。これが無いと、DOM の並び順で
      たまたま後に置いた本殿が、手前にあるはずの拝殿の上に描かれてしまう。 */
-  return SHRINE_PART_LAYOUT.map((p,i)=>{
-    /* 黒塗りは、切り出した別画像ではなく元絵（shrine-complete.png）そのものを
-       この建物の位置だけ覗かせて暗くする。切り出し画像とのズレが出ないよう、
-       元絵1枚だけを基準にする（後ろの空・山まで暗くならないよう overflow:hidden で切る）。 */
-    const bgW=10000/p.width, bgL=-(p.left/p.width)*100, bgT=-(p.top/p.height)*100;
-    return `<div class="shrine-part" style="left:${p.left}%;top:${p.top}%;width:${p.width}%;height:${p.height}%;z-index:${Math.round(p.top)}">
-      <img class="shrine-part-mono" src="assets/shrine-complete.png" alt=""
-        style="left:${bgL}%;top:${bgT}%;width:${bgW}%">
-      <img class="shrine-part-color" src="${p.src}" alt="" style="--reveal:${shrinePartReveal(i)}%"></div>`;
-  }).join('');
+  return SHRINE_PART_LAYOUT.map((p,i)=>
+    `<div class="shrine-part" style="left:${p.left}%;top:${p.top}%;width:${p.width}%;height:${p.height}%;z-index:${Math.round(p.top)}">
+      <img class="shrine-part-mono" src="${p.src}" alt="">
+      <img class="shrine-part-color" src="${p.src}" alt="" style="--reveal:${shrinePartReveal(i)}%"></div>`).join('');
 }
 
 /* ══════════ 木像（宮大工・2026-08-01の決定） ══════════

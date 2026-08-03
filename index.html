@@ -393,10 +393,9 @@
   /* 段階ごとのオブジェクト（鳥居・手水舎など）を個別に下から色付きへ。
      背景（空・山・地面）は常に明るいまま、未着工の建物だけ暗いシルエットで見せる。 */
   .shrine-part{position:absolute;overflow:hidden}
-  .shrine-part img{position:absolute}
-  .shrine-part-mono{max-width:none;filter:grayscale(1) sepia(.18) brightness(.34) contrast(.9)}
-  .shrine-part-color{inset:0;width:100%;height:100%;object-fit:contain;
-    clip-path:inset(calc(100% - var(--reveal,0%)) 0 0 0);transition:clip-path .7s ease;
+  .shrine-part img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .shrine-part-mono{filter:grayscale(1) sepia(.18) brightness(.34) contrast(.9)}
+  .shrine-part-color{clip-path:inset(calc(100% - var(--reveal,0%)) 0 0 0);transition:clip-path .7s ease;
     filter:saturate(.82) brightness(.88)}
   .shrine-copy{display:flex;flex-direction:column;justify-content:center}
   .shrine-copy h2,.shrine-panel>h2{font-family:'Shippori Mincho',serif;font-size:27px;
@@ -816,7 +815,7 @@ const yen=n=>n.toLocaleString();
 <script src="src/ui/map.js?v=20260731-2"></script>
 <script src="src/audio.js?v=20260731-3"></script>
 <script src="src/tutorial.js?v=20260731-3"></script>
-<script src="src/game.js?v=20260801-11"></script>
+<script src="src/game.js?v=20260801-12"></script>
 <script src="src/scene3d.js?v=20260801-1"></script>
 <script>
 (() => {
