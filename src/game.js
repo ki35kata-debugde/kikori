@@ -1469,12 +1469,18 @@ function requestFavor(k,opts){
       const result=favorExecute(k,opts);
       if(!result){nightMessage('材料が足りず、頼めなかった。',true);drawNight();return}
       WORLD.money-=f.cost;
-      WORLD.favors[k]={lastDay:WORLD.day};
+      WORLD.favors[k]??={};WORLD.favors[k].lastDay=WORLD.day;
       soundSuccess();
       nightMessage(favorResultText(k,result));
       saveGame('auto');
       drawNight();topbar();
     }});
+}
+/* その依頼主の依頼をちょうど全部終えた瞬間、頼み事が解禁されたことを一度だけ知らせる */
+function announceFavor(client,fav){
+  showStory({label:clientName(client),title:'頼み事ができるようになった',
+    body:`${clientName(client)}の依頼をすべて終えた。\n今度はこちらから「${fav.title}」を頼めるようになった。\n${fav.title}：${fav.desc}\n夜の「依頼」タブから試してみよう。`,
+    button:'わかった'});
 }
 /* 解禁物を日本語にする */
 const UNLOCK_LABEL={miyama:'深山へ入れる',doghouse:'犬小屋',snow:'雪の峰へ入れる',
