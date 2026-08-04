@@ -1084,7 +1084,7 @@ function updateNightDog(){
     el.style.animation='none';el.style.transform='scaleX(-1)';
     el.src=dogArt(k,'mascot');
   };
-  el.alt=`土間で休む${DOGS[k].name}`;
+  el.alt=`土間で休む${dogDisplayName(k)}`;
   el.classList.remove('hide');
   /* 柴犬だけ、起きている間は床を歩く。待機3回＋大喜び1回を2〜3セット後、
      その場で寝る。ほかの犬は最初から移動せず寝る。 */
@@ -1277,7 +1277,8 @@ function drawNight(){
       <b class="mid">本殿完成後の祭り</b>で出会う。連れて入った林の手入れ度が100なら、
       植えた苗が<b>神木</b>になる。</p>
       <div class="row"><b class="${kishuReady?'ok':'mid'}">${
-        kishuReady?'山へついてくる':'祭りが戻るのを待つ'}</b></div></div>`;
+        kishuReady?'山へついてくる':'祭りが戻るのを待つ'}</b>${
+        kishuReady?`<button data-mascot="kishu" class="${WORLD.mascot==='kishu'?'sel':''}">伐採時に表示</button>`:''}</div></div>`;
     body.innerHTML=html;
     body.querySelectorAll('[data-adopt]').forEach(b=>b.onclick=()=>adoptDog(b.dataset.adopt));
     body.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>{
@@ -1562,12 +1563,14 @@ function buyGood(k,n){
    3頭とも連れて歩くので、姿は選べる（WORLD.mascot）。
    絵は assets/<犬>-mascot.png を探し、無ければ柴犬の絵を借りて色を変える。
    秋田犬と甲斐犬の透過PNGを置けば、そのまま本物に切り替わる。 */
-/* 紀州犬はなつき度だけ持ち、昼のマスコットには出さない（DOGS に絵・能力の登録が無い）。
-   マスコットの候補からは常に除く。 */
+/* 紀州犬は飼う犬（DOGS登録）ではないが、絵は一式揃っているのでマスコットには選べる。
+   能力（なつき度で伸びる一段目・二段目）は持たない。 */
+const MASCOT_ONLY=['kishu'];
+const dogDisplayName=k=>DOGS[k]?.name||(k==='kishu'?'紀州犬':k);
 const mascotDog=()=>{
   const k=WORLD.mascot;
-  if(k&&hasDog(k)&&DOGS[k])return k;
-  return Object.keys(WORLD.dogs||{}).find(x=>DOGS[x])||null;
+  if(k&&hasDog(k)&&(DOGS[k]||MASCOT_ONLY.includes(k)))return k;
+  return Object.keys(WORLD.dogs||{}).find(x=>DOGS[x]||MASCOT_ONLY.includes(x))||null;
 };
 function dogArt(k,mood='mascot'){
   return k==='shiba'?`assets/shiba-${mood}.png`:`assets/${k}-${mood}.png`;
@@ -1588,7 +1591,7 @@ function updateForestMascot(){
   const k=mascotDog();
   el.className=k?`forest-dog dog-${k}`:'forest-bird';
   if(k){
-    el.alt=`森を一緒に歩く${DOGS[k].name}`;
+    el.alt=`森を一緒に歩く${dogDisplayName(k)}`;
     /* コマ絵があれば待機の動きを回す。無ければ1枚絵のまま */
     if(!playDogAnimation('idle'))setMascotArt(el,k);
   }
@@ -1605,8 +1608,6 @@ function senseShown(t){
 }
 function dogImageFor(t){
   const k=mascotDog(); if(!k)return 'assets/bird-mascot.png';
-  /* 表情違い（happy/worried）の絵は柴犬・秋田犬・甲斐犬のみ用意されている
-     （紀州犬は飼えないので mascotDog() には出てこない）。 */
   const p=t?senseShown(t):'normal';
   return dogArt(k,p==='fine'?'happy':p==='rot'?'worried':'mascot');
 }
@@ -1620,7 +1621,7 @@ function showDogSense(t,walk=false){
    :p==='rot' ?playDogAnimation('inspect',{loop:true})
    :false);
   if(!anim)setMascotArt(el,k,p==='fine'?'happy':p==='rot'?'worried':'mascot');
-  const nm=DOGS[k].name;
+  const nm=dogDisplayName(k);
   el.alt=p==='fine'?`良材を見つけて喜ぶ${nm}`:p==='rot'?`木の異変を心配する${nm}`:`木を見つめる${nm}`;
   if(walk&&!anim)mascotReact('walk');
 }
