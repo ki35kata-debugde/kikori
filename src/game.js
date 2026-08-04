@@ -930,7 +930,7 @@ function finishStatue(fid){
   if(WORLD.statues.done.length===5)
     showStory({label:'木像',title:'五つの台座',
       body:'五つの林、五つの木像。すべての台座に、山の姿が揃った。\n\n宮大工は、いつの間にか姿を消していた。',
-      button:'山を見渡す'});
+      button:'山を見渡す',art:'assets/statue-stages/5.png'});
 }
 const partLabel=p=>{
   const bits=[SPECIES[p.species]?.name||p.species];
@@ -1362,6 +1362,8 @@ function drawNight(){
         :'<p>すべての木像が打ちあがった。</p>'}</div>`;
     }).join('');
     body.innerHTML=`<div class="statue-panel">
+      <img src="assets/statue-stages/${doneCount}.png" alt="境内の木像"
+        style="grid-column:1/-1;width:100%;border-radius:8px;display:block">
       <p style="grid-column:1/-1;font-size:11px;color:#aaa69b;margin-bottom:2px">
         手入れ度100の林に、紀州犬を連れて苗を植えると神木が育つ（十五日）。三本集まった林から、木像を打てる。</p>
       ${cards}</div>`;
