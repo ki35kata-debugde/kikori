@@ -863,14 +863,12 @@ const SHRINE_STAGES=[
     {species:'hinoki',bornGrade:'特等',need:5},
     {species:'hinoki',bornGrade:'一等',dried:true,grade:'特等',need:5}]}
 ];
-/* SHRINE_STAGES と同じ並び。assets/shrine-complete.png（1536×1024）上での
-   各建物の位置を%で持つ。design/calib.html で実測して合わせた値。 */
 const SHRINE_PART_LAYOUT=[
-  {src:'assets/shrine-parts/01-torii.png',  left:11.72,top:64.45,width:18.23,height:32.03},
-  {src:'assets/shrine-parts/02-chozuya.png',left:46.88,top:66.41,width:14.32,height:23.44},
-  {src:'assets/shrine-parts/03-do.png',     left:16.93,top:39.06,width:19.53,height:22.66},
-  {src:'assets/shrine-parts/04-haiden.png', left:45.57,top:38.09,width:24.74,height:25.59},
-  {src:'assets/shrine-parts/05-honden.png', left:63.80,top:14.65,width:23.44,height:32.52}
+  {mask:'assets/shrine-scene-masks/01-torii.png',  left:11.72,top:64.45,width:18.23,height:32.03},
+  {mask:'assets/shrine-scene-masks/02-chozuya.png',left:46.88,top:66.41,width:14.32,height:23.44},
+  {mask:'assets/shrine-scene-masks/03-do.png',     left:16.93,top:39.06,width:19.53,height:22.66},
+  {mask:'assets/shrine-scene-masks/04-haiden.png', left:45.57,top:38.09,width:24.74,height:25.59},
+  {mask:'assets/shrine-scene-masks/05-honden.png', left:63.80,top:14.65,width:23.44,height:32.52}
 ];
 /* その建物だけの色づき具合（%）。終えた段階は100、まだ来ていない段階は0、
    いま進めている段階はその段階の納材率だけ下から色が戻る。 */
@@ -884,14 +882,20 @@ function shrinePartReveal(i){
   const need=def.parts.reduce((a,p)=>a+p.need,0);
   return need?Math.min(100,now/need*100):0;
 }
+/* 黒塗りは、元絵（shrine-complete.png）そのものに、建物ごとのシルエットマスク
+   （元絵と同じ1536×1024の白黒画像。assets/shrine-scene-masks/）を重ねて作る。
+   切り出し画像を使わないので元絵とのズレが起きようがない。マスクは建物ごとに
+   位置が焼き込まれているので、この要素自体は毎回シーン全体を指す。
+   下からの色付きは、建物自身の縦幅の中で clip-path を動かして表現する。 */
 function shrinePartsHTML(){
-  /* 奥行きの重なり順。top（画面上の高さ）が大きいほど手前にあるので、
-     手前のものほど z-index を高くする。これが無いと、DOM の並び順で
-     たまたま後に置いた本殿が、手前にあるはずの拝殿の上に描かれてしまう。 */
-  return SHRINE_PART_LAYOUT.map((p,i)=>
-    `<div class="shrine-part" style="left:${p.left}%;top:${p.top}%;width:${p.width}%;height:${p.height}%;z-index:${Math.round(p.top)}">
-      <img class="shrine-part-mono" src="${p.src}" alt="">
-      <img class="shrine-part-color" src="${p.src}" alt="" style="--reveal:${shrinePartReveal(i)}%"></div>`).join('');
+  return SHRINE_PART_LAYOUT.map((p,i)=>{
+    const reveal=shrinePartReveal(i);
+    const revealBoundaryY=p.top+p.height*(1-reveal/100);
+    const bottomInset=Math.max(0,100-revealBoundaryY);
+    return `<img class="shrine-part-dark" src="assets/shrine-complete.png" alt=""
+      style="mask-image:url(${p.mask});-webkit-mask-image:url(${p.mask});
+      clip-path:inset(0 0 ${bottomInset}% 0);z-index:${Math.round(p.top)}">`;
+  }).join('');
 }
 
 /* ══════════ 木像（宮大工・2026-08-01の決定） ══════════
@@ -1829,4 +1833,3 @@ $('load-shortcut').onclick=()=>{
 };
 
 /* ══════════ ループ ══════════ */
-
